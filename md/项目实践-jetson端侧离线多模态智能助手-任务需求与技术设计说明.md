@@ -347,4 +347,181 @@ docs/
 本项目面向 Jetson AGX Orin 32GB，基于 llama.cpp-omni 构建离线多模态大模型推理系统。项目研究本地 VLM/LLM 加载、低比特权重量化、KV Cache、Prefill/Decode、C++ Runtime、RAG、工具调用、模型蒸馏、结构化剪枝和 ARM64 离线部署。
 
 项目最终目标不是实现一个简单聊天 Demo，而是建立一套可观测、可量化、可回滚的端侧多模态模型部署流程，并在核心能力稳定后选择合适的实际应用场景。
++
+## 14. 应用层借鉴与 llama.cpp-omni 改造方案
+
+根据提供的 autonomous-intelligence README，其成熟或已验证的应用层思路主要包括：
+
+- 持续单会话对话；
+- 即时记忆摘要；
+- 长期记忆和向量数据库；
+- 语音识别和语音合成；
+- 视觉服务；
+- 事件驱动的应用拆分；
+- 自动启动；
+- 工具调用；
+- 本地设备上的模型和服务。
+
+本项目借鉴这些架构思路，不修改上游仓库，也不把上游 README 中标记为 pending 的功能当作已经完成。
+
+### 14.1 后端替换关系
+
+| 上游应用层思路 | 本项目实现 |
+| --- | --- |
+| 主对话循环 | llama.cpp-omni Backend Adapter |
+| OpenAI/Anthropic/Groq 模型调用 | Jetson 本地 LLM/VLM Runtime |
+| OpenAI Vision | llama.cpp-omni 多模态输入 |
+| OpenAI Whisper | 本地 faster-whisper，按资源情况启用 |
+| OpenAI TTS | 本地 Piper/Kokoro，按资源情况启用 |
+| VoyageAI Embedding | 本地 Embedding 模型 |
+| Pinecone | 本地向量库 |
+| Hailo/Raspberry Pi Vision | Jetson USB 摄像头和本地 Vision Adapter |
+| 多服务事件通信 | Jetson 进程、Unix Socket 或事件队列 |
+| 自动启动 | systemd |
+| 云端依赖 | 离线模型和本地服务 |
+
+### 14.2 应用层接口
+
+应用层不直接依赖 llama.cpp-omni 内部类，而通过适配器调用：
+
+~~~text
+initialize(config)
+generate_text(request)
+generate_with_image(request)
+stream_generate(request, callback)
+reset_context(session_id)
+cancel(request_id)
+get_runtime_metrics()
+shutdown()
+~~~
+
+这些是项目设计接口，不代表上游仓库当前已经提供同名函数。拉取源码后需要根据实际 API 编写适配器。
+
+### 14.3 持续对话
+
+区别于一次请求一次响应，系统维护一个长期会话：
+
+~~~text
+用户输入
+    ↓
+当前上下文
+    ↓
+即时记忆摘要
+    ↓
+长期记忆检索
+    ↓
+llama.cpp-omni
+    ↓
+回复和记忆更新
+~~~
+
+需要解决：
+
+- 上下文长度；
+- KV Cache；
+- 记忆摘要触发条件；
+- 旧消息归档；
+- 会话重置；
+- 多会话隔离；
+- 隐私数据删除。
+
+### 14.4 事件驱动服务
+
+建议将应用拆成：
+
+~~~text
+main_assistant
+    ├── llama_backend
+    ├── memory_service
+    ├── vision_service
+    ├── speech_input_service
+    ├── speech_output_service
+    ├── tool_service
+    └── metrics_service
+~~~
+
+初期可以先在同一进程中使用模块接口，确认功能后再拆成独立进程。这样可以降低最初的调试成本，也避免过早引入分布式通信问题。
+
+### 14.5 本地化改造要求
+
+本项目正式目标是离线运行，因此必须逐步替换或隔离：
+
+- OpenAI/Anthropic/Groq 云端模型；
+- Pinecone 云端向量数据库；
+- VoyageAI 云端 Embedding；
+- 云端 Whisper；
+- 云端 TTS；
+- Raspberry Pi/Hailo 专用服务。
+
+如果某个组件暂时只能使用云端，应在代码中做 Provider 抽象，并明确标记为开发期 fallback，不得把它当作最终离线能力。
+
+### 14.6 模型后端与应用层边界
+
+llama.cpp-omni Backend 负责：
+
+- 模型和 tokenizer；
+- VLM/LLM 推理；
+- Prefill/Decode；
+- KV Cache；
+- Sampling；
+- CUDA offload；
+- 流式输出；
+- 推理指标。
+
+应用层负责：
+
+- 会话；
+- 记忆；
+- RAG；
+- 工具；
+- 事件；
+- 语音；
+- 服务生命周期；
+- 日志和 API。
+
+这样后续更换模型、量化格式或 Runtime 时，不需要重写全部应用逻辑。
+
+### 14.7 推荐开发顺序
+
+1. 先跑通上游官方最小示例；
+2. 保存上游功能和性能 baseline；
+3. 写 Backend Adapter；
+4. 实现本地文本对话；
+5. 加入图片输入；
+6. 加入流式输出和 TTFT/TPOT；
+7. 加入即时记忆；
+8. 加入本地长期记忆；
+9. 加入本地语音服务；
+10. 加入工具调用；
+11. 加入 Docker/systemd；
+12. 最后再根据能力选择实际业务场景。
+
+### 14.8 许可证和借鉴边界
+
+借鉴上游架构时需要检查：
+
+- LICENSE；
+- 第三方依赖许可证；
+- 代码复制范围；
+- 版权声明；
+- 修改后发布要求；
+- 云服务依赖；
+- 模型和音频资源许可证。
+
+本项目可以借鉴架构思想和接口设计，但不应在没有确认许可证的情况下直接复制大段代码或删除上游版权信息。
+
+### 14.9 新增验收标准
+
+除原有验收标准外，应用层还应满足：
+
+- 单一持续会话可运行；
+- 即时记忆可压缩上下文；
+- 长期记忆可保存和检索；
+- 语音和视觉服务可以独立启停；
+- 事件错误不会导致主循环静默退出；
+- 云端 Provider 可替换为本地 Provider；
+- 应用层不直接依赖底层模型对象；
+- systemd 重启后会话和服务状态符合设计；
+- 所有云端依赖都有明确标识。
+
 

@@ -359,3 +359,139 @@ RAG/Agent/工具调用
     ↓
 Docker/systemd/监控/回滚
 ~~~
+
+## 13. 借鉴 autonomous-intelligence 的应用层架构
+
+根据提供的 README，autonomous-intelligence 的主要落地能力包括：
+
+- 持续单会话对话；
+- 即时记忆摘要；
+- 长期记忆和向量检索；
+- 语音输入和语音输出；
+- 视觉服务；
+- 人脸识别服务；
+- 事件驱动的多服务拆分；
+- 自动开机启动；
+- 工具调用；
+- 本地 Jetson/Raspberry Pi 设备适配。
+
+本项目借鉴的是这些应用层架构和产品思路，不直接复制上游代码、目录或未完成功能。
+
+### 13.1 应用层改造关系
+
+~~~text
+Tau 主对话循环
+    ↓
+llama.cpp-omni 本地 LLM/VLM Backend
+
+即时记忆
+    ↓
+本地上下文摘要模块
+
+长期记忆/Pinecone/Voyage
+    ↓
+本地 Embedding + 本地向量库
+
+OpenAI Whisper
+    ↓
+本地 faster-whisper 或其他本地 STT
+
+OpenAI TTS
+    ↓
+本地 Piper/Kokoro TTS
+
+Hailo/Raspberry Pi Vision
+    ↓
+Jetson USB 摄像头 + 本地 Vision Adapter
+
+事件驱动服务
+    ↓
+Jetson 本地进程/Unix Socket/事件队列
+~~~
+
+### 13.2 目标应用形态
+
+本项目的应用形态调整为：
+
+> **Jetson AGX Orin 上的离线语音视觉多模态个人智能助手。**
+
+核心闭环：
+
+~~~text
+用户语音/文本/图片
+    ↓
+本地输入服务
+    ↓
+llama.cpp-omni VLM/LLM
+    ↓
+即时记忆和长期记忆
+    ↓
+工具调用/文档检索
+    ↓
+文本、JSON 或本地语音输出
+~~~
+
+### 13.3 借鉴范围
+
+重点借鉴：
+
+- 持续对话，而不是一次请求一次会话；
+- 即时记忆摘要，控制上下文长度；
+- 长期记忆归档和检索；
+- 语音、视觉和主对话解耦；
+- 事件驱动的服务通信；
+- 自动启动和服务恢复；
+- 工具调用框架；
+- 后续可扩展的应用拆分。
+
+不直接继承：
+
+- Raspberry Pi 5 和 Hailo-8L 的硬件依赖；
+- Pinecone/VoyageAI 云端依赖；
+- OpenAI/Anthropic/Groq 云端推理；
+- 上游未完成的 TensorRT/Hailo 集成；
+- 上游的具体目录结构和实现细节。
+
+### 13.4 预期服务拆分
+
+第一阶段可拆分为：
+
+~~~text
+main_assistant
+    ├── llama_backend
+    ├── memory_service
+    ├── vision_service
+    ├── speech_input_service
+    ├── speech_output_service
+    ├── tool_service
+    └── metrics_service
+~~~
+
+初始阶段可以先运行在同一 Jetson 进程或少量进程中，待接口稳定后再拆分为 Unix Socket、WebSocket 或独立服务。
+
+### 13.5 对 llama.cpp-omni 的核心改造
+
+llama.cpp-omni 作为模型后端，主要承担：
+
+- 本地 LLM/VLM 加载；
+- 文本和图片请求；
+- Tokenizer；
+- Prefill/Decode；
+- KV Cache；
+- 流式生成；
+- Sampling；
+- CUDA offload；
+- TTFT/TPOT 统计。
+
+Tau 风格的应用层负责：
+
+- 持续会话；
+- 记忆摘要；
+- 长期记忆检索；
+- 工具调用；
+- 事件调度；
+- 语音输入输出；
+- 服务生命周期。
+
+两层通过 Backend Adapter 隔离，避免让应用层直接依赖 llama.cpp-omni 的内部对象和 API。
+
