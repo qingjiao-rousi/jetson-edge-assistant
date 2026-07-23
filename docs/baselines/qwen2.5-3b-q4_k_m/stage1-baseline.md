@@ -67,6 +67,33 @@
 | Effective runs | 至少 5 次；失败运行不计入有效次数，最多默认尝试 8 次 |
 | Telemetry | 每次单独启停 tegrastats，1000 ms 间隔 |
 
+## 正式 Benchmark 结果
+
+正式运行 ID：`qwen25-20260723T122143Z-75564`。被测主项目为干净的 `main@9b63aad86f5befc2d1b35e1cbd162e27b4cc0a5c`，Runtime 为 `jetson-runtime-dev@19cc26967140407efe34006a355ab445b35b16ac`，benchmark 脚本 SHA-256 为 `da476a61de1cfd17a4f6b47aba2f151d248ec058ce21febaa110df4c4c69d9da`。
+
+- 1 次独立 preconditioning 成功；
+- 5 次 measured run 全部成功，无失败重试；
+- 5 次均为 `CUDA0: Orin`，并报告 `offloaded 37/37 layers to GPU`；
+- 5 次输出均为相同的五项电机过热检查建议，格式符合固定 Prompt；
+- stderr 未发现 CUDA、OOM、GGUF、tokenizer 或参数错误。
+
+| 指标 | Mean | Median | Min | Max |
+| --- | ---: | ---: | ---: | ---: |
+| Prompt throughput | 329.602 tokens/s | 330.80 | 317.95 | 340.40 |
+| Decode throughput | 14.520 tokens/s | 14.52 | 14.50 | 14.53 |
+| Prompt eval | 194.346 ms | 193.47 | 188.01 | 201.29 |
+| Decode eval | 4821.066 ms | 4820.85 | 4817.56 | 4827.01 |
+| Runtime total | 5015.412 ms | 5018.40 | 5005.78 | 5023.43 |
+| CLI wall time | 6922.826 ms | 6904.54 | 6895.657 | 6991.543 |
+
+`tegrastats` 在五次 measured run 中观测到：峰值 RAM `10625/30697 MB`、Swap `0 MB`、峰值 GR3D `99%`、峰值 GPU 温度 `55.406°C`、峰值 TJ 温度 `56.812°C`、峰值 `VDD_GPU_SOC 8798 mW`。`nvpmodel` 在测试后查询为 `MODE_30W`（ID 2），由于脚本未在测试开始时自动采集，该项仅作为测试后运行条件记录。短时结果不能用于证明长期温控或无降频，`VDD_GPU_SOC` 也不等同于整机功耗。
+
+可提交的配置、统计和遥测摘要：
+
+- `benchmark-config-qwen25-20260723.json`；
+- `benchmark-summary-qwen25-20260723.json`；
+- `benchmark-telemetry-qwen25-20260723.json`。
+
 正式执行命令：
 
 ```bash
@@ -91,6 +118,6 @@ python3 scripts/benchmark_qwen25.py
 
 ## 当前状态
 
-`--validate-only` 已在 2026-07-23 执行并通过：`valid=true`、`errors=[]`。验证结果保存为 `docs/baselines/qwen2.5-3b-q4_k_m/validate-only.json`，其中记录的脚本 SHA-256 为 `da476a61de1cfd17a4f6b47aba2f151d248ec058ce21febaa110df4c4c69d9da`。
+`--validate-only` 已在 2026-07-23 对主项目 `main@9b63aad` 执行并通过：`valid=true`、`errors=[]`、`project_git_state=committed`、`project_git_dirty=false`。正式 1 次 preconditioning + 5 次有效宿主机测量也已完成，阶段一核心退出条件已经满足。
 
-主项目当前仍是 unborn `main`，因此验证结果中的 project commit 为 `null`，并带有明确 warning。脚本在该状态下拒绝正式 benchmark。正式 1 次 preconditioning + 5 次有效宿主机测量尚未执行；应先创建阶段一首个 commit，再运行 benchmark，报告不伪造尚未采集的统计结果。
+仍保留三项非阻塞遗留：Hugging Face revision/LFS OID 待远端恢复后核对；Qwen3-4B 尚未进行同条件候选模型对比；统一的一键 Runtime 构建脚本尚待补充。下一阶段进入 DirectBackend 接口与最小文本闭环，这些遗留项继续在周报中跟踪。

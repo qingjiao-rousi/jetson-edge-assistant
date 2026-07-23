@@ -14,17 +14,15 @@
   "nvcc_sm_87": true,
   "project_git": {
     "branch": "main",
-    "commit": null,
-    "dirty": true,
-    "state": "unborn"
+    "commit": "9b63aad86f5befc2d1b35e1cbd162e27b4cc0a5c",
+    "dirty": false,
+    "state": "committed"
   },
-  "project_git_commit": null,
-  "project_git_state": "unborn",
+  "project_git_commit": "9b63aad86f5befc2d1b35e1cbd162e27b4cc0a5c",
+  "project_git_state": "committed",
   "runtime_branch": "jetson-runtime-dev",
   "runtime_commit": "19cc26967140407efe34006a355ab445b35b16ac",
   "tegrastats": "/usr/bin/tegrastats",
   "valid": true,
-  "warnings": [
-    "main project has no commit yet; validation is allowed, but a formal benchmark is not"
-  ]
+  "warnings": []
 }

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "benchmark_run_id": "qwen25-20260723T122143Z-75564",
+  "measured_runs": 5,
+  "source": {
+    "directory": "benchmark-results/qwen2.5-3b-q4_k_m/qwen25-20260723T122143Z-75564",
+    "tegrastats_interval_ms": 1000,
+    "raw_results_git_policy": "ignored; retained locally"
+  },
+  "power_mode": {
+    "name": "MODE_30W",
+    "id": 2,
+    "evidence": "sudo nvpmodel -q executed immediately after the benchmark",
+    "limitation": "The benchmark script did not capture nvpmodel at run start; this is a post-run observation."
+  },
+  "observed_peaks": {
+    "ram_used_mb": 10625,
+    "ram_total_mb": 30697,
+    "swap_used_mb": 0,
+    "gr3d_frequency_percent": 99,
+    "gpu_temperature_c": 55.406,
+    "tj_temperature_c": 56.812,
+    "vdd_gpu_soc_mw": 8798
+  },
+  "observations": [
+    "All five measured runs produced non-empty output and exited with code 0.",
+    "All five measured runs reported 37/37 layers offloaded to CUDA0.",
+    "No CUDA, OOM, GGUF, tokenizer, or invalid-argument error was found in measured stderr logs.",
+    "VDD_GPU_SOC is a reported Jetson power rail and must not be presented as total module power.",
+    "The short benchmark cannot establish long-duration thermal stability or absence of throttling."
+  ]
+}

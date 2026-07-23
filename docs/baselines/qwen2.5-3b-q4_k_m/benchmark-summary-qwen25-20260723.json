@@ -1,0 +1,70 @@
+{
+  "attempts": 5,
+  "benchmark_run_id": "qwen25-20260723T122143Z-75564",
+  "benchmark_script_sha256": "da476a61de1cfd17a4f6b47aba2f151d248ec058ce21febaa110df4c4c69d9da",
+  "complete": true,
+  "metric_semantics": {
+    "runtime_decode_tokens_per_second": "Decode throughput reported by llama-cli.",
+    "runtime_prompt_tokens_per_second": "Prompt throughput reported by llama-cli.",
+    "wall_time_ms": "End-to-end llama-cli process wall-clock duration; not TTFT or TPOT."
+  },
+  "metrics": {
+    "runtime_decode_eval_ms": {
+      "count": 5,
+      "max": 4827.01,
+      "mean": 4821.066,
+      "median": 4820.85,
+      "min": 4817.56,
+      "p95_nearest_rank": 4827.01
+    },
+    "runtime_decode_tokens_per_second": {
+      "count": 5,
+      "max": 14.53,
+      "mean": 14.52,
+      "median": 14.52,
+      "min": 14.5,
+      "p95_nearest_rank": 14.53
+    },
+    "runtime_prompt_eval_ms": {
+      "count": 5,
+      "max": 201.29,
+      "mean": 194.346,
+      "median": 193.47,
+      "min": 188.01,
+      "p95_nearest_rank": 201.29
+    },
+    "runtime_prompt_tokens_per_second": {
+      "count": 5,
+      "max": 340.4,
+      "mean": 329.602,
+      "median": 330.8,
+      "min": 317.95,
+      "p95_nearest_rank": 340.4
+    },
+    "runtime_total_ms": {
+      "count": 5,
+      "max": 5023.43,
+      "mean": 5015.412,
+      "median": 5018.4,
+      "min": 5005.78,
+      "p95_nearest_rank": 5023.43
+    },
+    "wall_time_ms": {
+      "count": 5,
+      "max": 6991.543,
+      "mean": 6922.8256,
+      "median": 6904.54,
+      "min": 6895.657,
+      "p95_nearest_rank": 6991.543
+    }
+  },
+  "project_git": {
+    "branch": "main",
+    "commit": "9b63aad86f5befc2d1b35e1cbd162e27b4cc0a5c",
+    "dirty": false,
+    "state": "committed"
+  },
+  "required_valid_runs": 5,
+  "schema_version": 1,
+  "valid_runs": 5
+}
