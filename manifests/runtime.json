@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-07-23T10:17:42Z",
+  "submodule": {
+    "path": "third_party/llama.cpp-omni",
+    "url": "git@github.com:qingjiao-rousi/llama.cpp-omni.git",
+    "branch": "jetson-runtime-dev",
+    "commit": "19cc26967140407efe34006a355ab445b35b16ac"
+  },
+  "commit_subject": "fix(server): expose mtmd include path to cli targets",
+  "commit_time": "2026-07-22T22:48:43-04:00",
+  "required_state": {
+    "branch": "jetson-runtime-dev",
+    "commit_short": "19cc269"
+  }
+}
