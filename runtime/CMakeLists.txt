@@ -42,6 +42,16 @@ target_include_directories(edgeomni_service PUBLIC include
     ../third_party/llama.cpp-omni/vendor)
 target_link_libraries(edgeomni_service PUBLIC edgeomni_runtime edgeomni_cpp_httplib Threads::Threads)
 
+if(EDGEOMNI_BUILD_BENCHMARK_TOOLS)
+    add_executable(edgeomni_qwen3_benchmark_runner tools/qwen3_benchmark_runner.cpp)
+    target_compile_features(edgeomni_qwen3_benchmark_runner PRIVATE cxx_std_17)
+    target_include_directories(edgeomni_qwen3_benchmark_runner PRIVATE
+        ../third_party/llama.cpp-omni/vendor)
+    target_link_libraries(edgeomni_qwen3_benchmark_runner PRIVATE edgeomni_runtime)
+    set_target_properties(edgeomni_qwen3_benchmark_runner PROPERTIES
+        BUILD_RPATH "${EDGEOMNI_LLAMA_BUILD_DIR}/bin")
+endif()
+
 if(EDGEOMNI_BUILD_TESTS)
     add_executable(edgeomni_runtime_unit_test tests/runtime_unit_test.cpp)
     target_compile_features(edgeomni_runtime_unit_test PRIVATE cxx_std_17)

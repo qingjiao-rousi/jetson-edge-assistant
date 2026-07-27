@@ -1,0 +1,262 @@
+#!/usr/bin/env python3
+"""DirectBackend-only Qwen3 Q4_K_M/Q8_0 benchmark orchestrator.
+
+The default mode is a read-only preflight/plan.  Model execution requires the
+explicit --execute flag; no llama-cli subprocess is ever used.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import json
+import os
+import re
+import shutil
+import statistics
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+TYPE_NAMES = {7: "Q8_0", 15: "Q4_K_M", 1: "F16", 32: "BF16"}
+TYPES = {"q4_k_m": "Q4_K_M", "q8_0": "Q8_0"}
+
+
+def read_json(path: Path) -> dict[str, Any]:
+    with path.open(encoding="utf-8") as stream:
+        return json.load(stream)
+
+
+def read_gguf_metadata(path: Path) -> dict[str, Any]:
+    """Read GGUF header/KV values without loading tensors or initializing llama."""
+    import struct
+
+    scalar = {0: "B", 1: "b", 2: "H", 3: "h", 4: "I", 5: "i", 6: "f", 7: "?", 10: "Q", 11: "q", 12: "d"}
+    wanted = {"general.architecture", "general.file_type", "general.quantization_version", "tokenizer.chat_template", "qwen3.context_length", "qwen3.block_count", "general.basename", "general.finetune"}
+
+    def string(stream):
+        size = struct.unpack("<Q", stream.read(8))[0]
+        return stream.read(size).decode("utf-8", "replace")
+
+    def value(stream, kind):
+        if kind == 8:
+            return string(stream)
+        if kind == 9:
+            subtype = struct.unpack("<I", stream.read(4))[0]
+            size = struct.unpack("<Q", stream.read(8))[0]
+            if subtype == 8:
+                return [string(stream) for _ in range(size)]
+            if subtype not in scalar:
+                raise ValueError(f"unsupported GGUF array type {subtype}")
+            fmt = scalar[subtype]
+            raw = stream.read(struct.calcsize("<" + fmt) * size)
+            return list(struct.unpack("<" + fmt * size, raw))
+        if kind not in scalar:
+            raise ValueError(f"unsupported GGUF value type {kind}")
+        fmt = scalar[kind]
+        return struct.unpack("<" + fmt, stream.read(struct.calcsize("<" + fmt)))[0]
+
+    with path.open("rb") as stream:
+        if stream.read(4) != b"GGUF":
+            raise ValueError("invalid GGUF magic")
+        version, tensor_count, kv_count = struct.unpack("<IQQ", stream.read(20))
+        metadata: dict[str, Any] = {}
+        for _ in range(kv_count):
+            key = string(stream)
+            kind = struct.unpack("<I", stream.read(4))[0]
+            parsed = value(stream, kind)
+            if key in wanted:
+                metadata[key] = parsed
+    template = metadata.get("tokenizer.chat_template")
+    return {
+        "gguf_version": version,
+        "tensor_count": tensor_count,
+        "metadata": metadata,
+        "chat_template_present": isinstance(template, str) and bool(template),
+        "chat_template_bytes": len(template.encode()) if isinstance(template, str) else 0,
+        "chat_template_sha256": hashlib.sha256(template.encode()).hexdigest() if isinstance(template, str) else None,
+    }
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def preflight(model_id: str, config: dict[str, Any], assets: dict[str, Any], baseline: dict[str, Any]) -> dict[str, Any]:
+    expected_name = TYPES[model_id]
+    asset = next((item for item in assets["assets"] if item["id"] == model_id), None)
+    if not asset or asset.get("status") != "READY" or asset.get("benchmark_admission") != "allowed":
+        raise RuntimeError(f"asset {model_id} is not READY in manifests/qwen3-quant-kv-assets.json")
+    path = ROOT / asset["path"]
+    if not path.is_file():
+        raise RuntimeError(f"model path does not exist: {path}")
+    actual_sha = sha256_file(path)
+    if actual_sha != asset["sha256"]:
+        raise RuntimeError(f"sha256 mismatch: expected {asset['sha256']}, got {actual_sha}")
+    if path.stat().st_size != asset["size_bytes"]:
+        raise RuntimeError("model size mismatch against asset manifest")
+    metadata = read_gguf_metadata(path)
+    values = metadata["metadata"]
+    if values.get("general.architecture") != "qwen3":
+        raise RuntimeError("GGUF architecture is not qwen3")
+    if TYPE_NAMES.get(values.get("general.file_type")) != expected_name:
+        raise RuntimeError(f"GGUF file type is not {expected_name}")
+    if values.get("general.quantization_version") != 2:
+        raise RuntimeError("unsupported quantization_version")
+    template_sha = config["model_lineage"]["chat_template_sha256"]
+    if metadata["chat_template_sha256"] != template_sha:
+        raise RuntimeError("chat template fingerprint mismatch")
+    if not metadata["chat_template_present"]:
+        raise RuntimeError("tokenizer.chat_template is missing")
+    if baseline["model"]["architecture"] != "qwen3" or baseline["model"]["reasoning"] != "off":
+        raise RuntimeError("deployment baseline is not the frozen Qwen3 reasoning-off baseline")
+    if asset["provenance"]["source_revision"] != baseline["model"]["source_revision"]:
+        raise RuntimeError("asset revision differs from deployment baseline")
+    return {"id": model_id, "path": str(path), "sha256": actual_sha, "file_type": expected_name, "size_bytes": path.stat().st_size, "metadata": metadata}
+
+
+def workload(workload_id: str, config: dict[str, Any]) -> tuple[str, int]:
+    item = next(item for item in config["workloads"] if item["id"] == workload_id)
+    if workload_id == "S":
+        prompt = "Provide a concise device status report. Include temperature, power mode, GPU availability, memory state, and one actionable recommendation. Use plain text and do not reason aloud."
+    elif workload_id == "G":
+        prompt = "Provide a detailed but deterministic diagnostic report for this device. Cover operating state, thermal risk, memory pressure, GPU utilization, power mode, likely cause, verification steps, and remediation steps. Use numbered sections and do not reason aloud."
+    else:
+        line = "timestamp=2026-07-27 subsystem=gpu state=nominal temperature=55C memory=stable power=MODE_30W recommendation=continue-monitoring; "
+        prompt = "Analyze the following fixed device log and summarize anomalies and actions. Do not reason aloud.\n" + line * 150
+    return prompt, item["max_new_tokens"]
+
+
+def telemetry_peaks(path: Path) -> dict[str, int | None]:
+    patterns = {"peak_ram_mb": r"\bRAM\s+(\d+)/", "peak_gr3d_percent": r"\bGR3D_FREQ\s+(\d+)%", "peak_gpu_temp_c": r"\bGPU@([0-9]+(?:\.[0-9]+)?)C", "peak_tj_temp_c": r"\bTJ@([0-9]+(?:\.[0-9]+)?)C", "peak_vdd_gpu_soc_mw": r"\bVDD_GPU_SOC\s+(\d+)mW"}
+    values: dict[str, list[int]] = {key: [] for key in patterns}
+    if path.is_file():
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            for key, pattern in patterns.items():
+                match = re.search(pattern, line)
+                if match:
+                    values[key].append(round(float(match.group(1))))
+    return {key: max(items) if items else None for key, items in values.items()}
+
+
+def run_one(args: argparse.Namespace, validation: dict[str, Any], prompt_id: str, phase: str, attempt: int, output_dir: Path) -> dict[str, Any]:
+    prompt, max_new_tokens = workload(prompt_id, args.config)
+    run_dir = output_dir / phase / prompt_id / f"attempt-{attempt:02d}"
+    run_dir.mkdir(parents=True, exist_ok=False)
+    command = [args.runner, "--model", validation["path"], "--sha256", validation["sha256"], "--prompt", prompt, "--max-new-tokens", str(max_new_tokens), "--context", str(args.config["fixed_runtime"]["context_tokens"]), "--batch", str(args.config["fixed_runtime"]["batch_tokens"]), "--ubatch", str(args.config["fixed_runtime"]["ubatch_tokens"]), "--gpu-layers", str(args.config["fixed_runtime"]["gpu_layers"]), "--seed", str(args.config["sampling"]["seed"]), "--top-k", str(args.config["sampling"]["top_k"]), "--top-p", str(args.config["sampling"]["top_p"]), "--min-p", str(args.config["sampling"]["min_p"]), "--temperature", str(args.config["sampling"]["temperature"]), "--request-id", f"{args.model}-{prompt_id}-{phase}-{attempt:02d}"]
+    (run_dir / "command.json").write_text(json.dumps({"argv": command}, indent=2) + "\n", encoding="utf-8")
+    telemetry_path = run_dir / "tegrastats.log"
+    telemetry = None
+    if args.tegrastats and shutil.which("tegrastats"):
+        telemetry = subprocess.Popen([shutil.which("tegrastats"), "--interval", str(args.config["telemetry"]["interval_ms"])], stdout=telemetry_path.open("w"), stderr=subprocess.STDOUT, text=True)
+    started = time.monotonic_ns()
+    completed = subprocess.run(command, capture_output=True, text=True, check=False)
+    ended = time.monotonic_ns()
+    if telemetry is not None:
+        telemetry.terminate()
+        try:
+            telemetry.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            telemetry.kill(); telemetry.wait(timeout=5)
+    (run_dir / "stdout.log").write_text(completed.stdout, encoding="utf-8")
+    (run_dir / "stderr.log").write_text(completed.stderr, encoding="utf-8")
+    record: dict[str, Any] = {"phase": phase, "prompt_id": prompt_id, "attempt": attempt, "model_id": args.model, "model_path": validation["path"], "model_sha256": validation["sha256"], "started_monotonic_ns": started, "ended_monotonic_ns": ended, "exit_code": completed.returncode, "telemetry_path": str(telemetry_path) if telemetry_path.exists() else None, "telemetry": telemetry_peaks(telemetry_path), "service_ttft_ms": None, "runtime_first_token_ms_is_not_service_ttft": True, "kv_cache": {"k": args.kv_k, "v": args.kv_v}, "power_mode_expected": {"name": args.config["fixed_runtime"]["nvpmodel_expected"], "id": args.config["fixed_runtime"]["nvpmodel_expected_id"]}}
+    try:
+        result = json.loads(completed.stdout.strip().splitlines()[-1])
+        record.update(result)
+        if isinstance(result.get("metrics"), dict):
+            record.update(result["metrics"])
+    except (json.JSONDecodeError, IndexError):
+        record.update({"code": "runner_output_invalid", "error_message": "runner did not emit JSON"})
+    record["valid"] = completed.returncode == 0 and record.get("code") == "ok" and record.get("finish_reason") in args.config["valid_run"]["finish_reasons"] and bool(record.get("text")) and (not args.tegrastats or telemetry_path.exists())
+    if not record["valid"]:
+        combined_error = (completed.stderr + " " + str(record.get("error_message", ""))).lower()
+        if args.tegrastats and not telemetry_path.exists(): record["failure_class"] = "telemetry_missing"
+        elif "out of memory" in combined_error or "oom" in combined_error or "allocation" in combined_error: record["failure_class"] = "oom_or_allocation_failed"
+        elif "cuda" in combined_error: record["failure_class"] = "cuda_error"
+        elif record.get("finish_reason") == "timeout" or record.get("code") == "timeout": record["failure_class"] = "timeout"
+        elif record.get("finish_reason") == "cancelled" or record.get("code") == "cancelled": record["failure_class"] = "cancelled"
+        elif record.get("finish_reason") == "length": record["failure_class"] = "incomplete_output"
+        else: record["failure_class"] = "internal"
+    (run_dir / "record.json").write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return record
+
+
+def write_outputs(output_dir: Path, records: list[dict[str, Any]], plan: dict[str, Any]) -> None:
+    with (output_dir / "records.jsonl").open("w", encoding="utf-8") as stream:
+        for record in records:
+            stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+    fields = ["phase", "prompt_id", "attempt", "model_id", "valid", "exit_code", "finish_reason", "prompt_tokens", "output_tokens", "model_ready_ms", "prefill_ms", "decode_ms", "first_token_ms", "total_ms", "decode_tokens_per_second", "failure_class"]
+    with (output_dir / "summary.csv").open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fields); writer.writeheader(); writer.writerows({key: record.get(key) for key in fields} for record in records)
+    valid = [record for record in records if record.get("valid") and record.get("phase") == "measured"]
+    summary = {"plan": plan, "attempted": len(records), "valid_measured": len(valid), "failed": len(records) - len(valid), "metrics": {}}
+    for key in ("model_ready_ms", "prompt_tokens", "output_tokens", "prefill_ms", "decode_ms", "first_token_ms", "total_ms", "decode_tokens_per_second"):
+        values = [float(record[key]) for record in valid if isinstance(record.get(key), (int, float))]
+        summary["metrics"][key] = {"count": len(values), "mean": statistics.mean(values), "median": statistics.median(values)} if values else None
+    (output_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model", choices=sorted(TYPES), required=True)
+    parser.add_argument("--config", type=Path, default=ROOT / "configs/qwen3-quant-kv-benchmark-v1.json")
+    parser.add_argument("--assets-manifest", type=Path, default=ROOT / "manifests/qwen3-quant-kv-assets.json")
+    parser.add_argument("--baseline", type=Path, default=ROOT / "manifests/deployment-baseline-v1.json")
+    parser.add_argument("--runner", default=str(ROOT / "build-runtime/runtime/edgeomni_qwen3_benchmark_runner"))
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--runs", type=int, default=None)
+    parser.add_argument("--preconditioning-runs", type=int, default=None)
+    parser.add_argument("--execute", action="store_true", help="run DirectBackend requests; without this flag only preflight/plan is written")
+    parser.add_argument("--tegrastats", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--kv-k", choices=("f16", "q8_0", "q4_0"), default="f16")
+    parser.add_argument("--kv-v", choices=("f16", "q8_0", "q4_0"), default="f16")
+    args = parser.parse_args()
+    if args.kv_k != "f16" or args.kv_v != "f16":
+        parser.error("current DirectBackend exposes no KV type override; only f16/f16 is executable in M6.3")
+    args.config = read_json(args.config); assets = read_json(args.assets_manifest); baseline = read_json(args.baseline)
+    validation = preflight(args.model, args.config, assets, baseline)
+    output_dir = args.output_dir or ROOT / "benchmark-results" / "qwen3-quant-kv" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    output_dir.mkdir(parents=True, exist_ok=False)
+    runs = args.runs if args.runs is not None else args.config["repetitions"]["valid_measured"]
+    preconditioning = args.preconditioning_runs if args.preconditioning_runs is not None else args.config["repetitions"]["preconditioning"]
+    if runs < 5 or preconditioning < 1:
+        raise SystemExit("--runs must be at least 5 and --preconditioning-runs must be positive")
+    power_observed = None
+    if args.execute and shutil.which("nvpmodel"):
+        power_observed = subprocess.run([shutil.which("nvpmodel"), "-q"], capture_output=True, text=True, check=False).stdout.strip()
+    plan = {"model": validation, "workloads": [item["id"] for item in args.config["workloads"]], "preconditioning_runs": preconditioning, "required_valid_measured": runs, "execute": args.execute, "runtime_first_token_ms_is_not_service_ttft": True, "kv_cache": {"k": args.kv_k, "v": args.kv_v, "note": "DirectBackend currently uses public context defaults F16/F16; no Runtime KV override was added in M6.3."}, "power_mode_expected": {"name": args.config["fixed_runtime"]["nvpmodel_expected"], "id": args.config["fixed_runtime"]["nvpmodel_expected_id"]}, "power_mode_observed": power_observed}
+    (output_dir / "plan.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if not args.execute:
+        write_outputs(output_dir, [], plan)
+        print(json.dumps({"status": "PREFLIGHT_READY", "output_dir": str(output_dir), "model": validation["file_type"]}))
+        return 0
+    if not Path(args.runner).is_file():
+        raise SystemExit(f"DirectBackend runner missing: {args.runner}; build the benchmark target first")
+    records = []
+    for prompt_id in [item["id"] for item in args.config["workloads"]]:
+        for attempt in range(1, preconditioning + 1): records.append(run_one(args, validation, prompt_id, "preconditioning", attempt, output_dir))
+        for attempt in range(1, runs + 1): records.append(run_one(args, validation, prompt_id, "measured", attempt, output_dir))
+    write_outputs(output_dir, records, plan)
+    if sum(1 for record in records if record.get("phase") == "measured" and record.get("valid")) < runs * 3:
+        print("fewer than required valid measured runs; see records.jsonl", file=sys.stderr)
+        return 2
+    print(json.dumps({"status": "COMPLETE", "output_dir": str(output_dir), "valid_measured": runs * 3}))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
+        print(f"preflight/error: {error}", file=sys.stderr)
+        raise SystemExit(1)
