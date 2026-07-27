@@ -68,9 +68,9 @@ top_p=`1.0`、min_p=`0.0`、temperature=`0.0`。Jetson 功耗模式沿用部署�
 
 | ID | 输入/输出目标 | `max_new_tokens` |
 | --- | --- | ---: |
-| S 短入短出 | 约 64--128 prompt tokens；固定中文设备状态问答 | 32 |
+| S 短入短出 | 实测渲染后 45 prompt tokens；配置门禁范围 40--50；固定设备状态问答 | 32 |
 | L 长入短出 | 约 2048 prompt tokens；确定性重复的设备日志模板 + 同一问答 | 32 |
-| G 短入长出 | 与 S 同 prompt 长度；固定结构化诊断说明 | 256 |
+| G 短入长出 | 实测渲染后 59 prompt tokens；配置门禁范围 55--65；固定结构化诊断说明 | 256 |
 
 Run manifest 必须保存每个完整 prompt、渲染后 prompt SHA-256、token 数、预期最大输出和实际
 输出 SHA-256。L 的原始日志文本由 runner 根据配置中的固定 template/repeat count 生成，并在

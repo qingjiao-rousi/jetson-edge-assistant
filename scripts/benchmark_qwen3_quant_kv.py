@@ -135,7 +135,7 @@ def workload(workload_id: str, config: dict[str, Any]) -> tuple[str, int]:
         # Keep the long workload below the fixed 4096-token context after
         # adding the ChatML prompt wrapper and its 32-token response budget.
         # The original 150 repetitions exceeded that budget on the real Qwen3
-        # tokenizer.  This frozen count targets the protocol's 1.9k-2.1k
+        # tokenizer.  This frozen count targets the protocol's 2.0k-2.06k
         # prompt-token range; the actual count is retained in every run record.
         prompt = "Analyze the following fixed device log and summarize anomalies and actions. Do not reason aloud.\n" + line * item["log_repeat_count"]
     return prompt, item["max_new_tokens"]
@@ -185,7 +185,11 @@ def run_one(args: argparse.Namespace, validation: dict[str, Any], prompt_id: str
             record.update(result["metrics"])
     except (json.JSONDecodeError, IndexError):
         record.update({"code": "runner_output_invalid", "error_message": "runner did not emit JSON"})
-    record["valid"] = completed.returncode == 0 and record.get("code") == "ok" and record.get("finish_reason") in args.config["valid_run"]["finish_reasons"] and bool(record.get("text")) and (not args.tegrastats or telemetry_path.exists())
+    item = next(item for item in args.config["workloads"] if item["id"] == prompt_id)
+    token_min, token_max = item["prompt_tokens_target"]
+    record["prompt_tokens_target"] = {"min": token_min, "max": token_max}
+    record["prompt_tokens_in_target"] = isinstance(record.get("prompt_tokens"), int) and token_min <= record["prompt_tokens"] <= token_max
+    record["valid"] = completed.returncode == 0 and record.get("code") == "ok" and record.get("finish_reason") in args.config["valid_run"]["finish_reasons"] and bool(record.get("text")) and record["prompt_tokens_in_target"] and (not args.tegrastats or telemetry_path.exists())
     if not record["valid"]:
         combined_error = (completed.stderr + " " + str(record.get("error_message", ""))).lower()
         if args.tegrastats and not telemetry_path.exists(): record["failure_class"] = "telemetry_missing"
@@ -194,6 +198,7 @@ def run_one(args: argparse.Namespace, validation: dict[str, Any], prompt_id: str
         elif "cuda" in combined_error: record["failure_class"] = "cuda_error"
         elif record.get("finish_reason") == "timeout" or record.get("code") == "timeout": record["failure_class"] = "timeout"
         elif record.get("finish_reason") == "cancelled" or record.get("code") == "cancelled": record["failure_class"] = "cancelled"
+        elif not record["prompt_tokens_in_target"]: record["failure_class"] = "workload_token_target_mismatch"
         elif record.get("finish_reason") == "length": record["failure_class"] = "incomplete_output"
         else: record["failure_class"] = "internal"
     (run_dir / "record.json").write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -204,7 +209,7 @@ def write_outputs(output_dir: Path, records: list[dict[str, Any]], plan: dict[st
     with (output_dir / "records.jsonl").open("w", encoding="utf-8") as stream:
         for record in records:
             stream.write(json.dumps(record, ensure_ascii=False) + "\n")
-    fields = ["phase", "prompt_id", "attempt", "model_id", "valid", "exit_code", "finish_reason", "prompt_tokens", "output_tokens", "model_ready_ms", "prefill_ms", "decode_ms", "first_token_ms", "total_ms", "decode_tokens_per_second", "failure_class"]
+    fields = ["phase", "prompt_id", "attempt", "model_id", "valid", "exit_code", "finish_reason", "prompt_tokens", "prompt_tokens_in_target", "output_tokens", "model_ready_ms", "prefill_ms", "decode_ms", "first_token_ms", "total_ms", "decode_tokens_per_second", "failure_class"]
     with (output_dir / "summary.csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields); writer.writeheader(); writer.writerows({key: record.get(key) for key in fields} for record in records)
     valid = [record for record in records if record.get("valid") and record.get("phase") == "measured"]
