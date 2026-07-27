@@ -52,9 +52,11 @@ PROMPTS_CONFIG = ROOT / "configs/model-selection-prompts-v1.json"
 MANIFEST = ROOT / "manifests/model-selection.json"
 DEFAULT_OUTPUT = ROOT / "benchmark-results/model-selection"
 OFFLOAD_RE = re.compile(r"offloaded\s+(\d+)\s*/\s*(\d+)\s+layers\s+to\s+GPU", re.I)
-PROMPT_TIMING_RE = re.compile(r"prompt eval time\s*=\s*([0-9.]+) ms\s*/\s*([0-9]+) tokens.*?([0-9.]+) tokens per second", re.I)
-DECODE_TIMING_RE = re.compile(r"eval time\s*=\s*([0-9.]+) ms\s*/\s*([0-9]+) (?:tokens|runs).*?([0-9.]+) tokens per second", re.I)
-TOTAL_TIMING_RE = re.compile(r"total time\s*=\s*([0-9.]+) ms", re.I)
+# Match the complete llama.cpp timing payload, not a substring: ``eval time``
+# must never consume the ``prompt eval time`` line.
+PROMPT_TIMING_RE = re.compile(r"^.*?\|\s*prompt eval time\s*=\s*([0-9.]+) ms\s*/\s*([0-9]+) tokens\s*\([^\r\n]*?,\s*([0-9.]+) tokens per second\)\s*$", re.I | re.M)
+DECODE_TIMING_RE = re.compile(r"^.*?\|\s+eval time\s*=\s*([0-9.]+) ms\s*/\s*([0-9]+) (?:tokens|runs)\s*\([^\r\n]*?,\s*([0-9.]+) tokens per second\)\s*$", re.I | re.M)
+TOTAL_TIMING_RE = re.compile(r"^.*?\|\s*total time\s*=\s*([0-9.]+) ms\s*/\s*[0-9]+ tokens\s*$", re.I | re.M)
 TIMING_LINE_RE = re.compile(r"^\[\s*Prompt:.*\]\s*$", re.M)
 CUDA_ERROR_RE = re.compile(r"(?:cuda|cublas|nvmap|nvrm|memory manager).*(?:error|failed|not supported)|failed to initialize CUDA", re.I)
 FATAL_RE = re.compile(r"out of memory|\boom\b|failed to load|unsupported model|error.*(?:gguf|tokenizer|chat template|template)|(?:gguf|tokenizer|chat template|template).*error", re.I)

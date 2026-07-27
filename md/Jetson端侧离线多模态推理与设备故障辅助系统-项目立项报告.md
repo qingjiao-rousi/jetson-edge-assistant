@@ -190,11 +190,13 @@ Tokenizer 工程任务限定为模型与 Runtime 的输入一致性验证：核�
 
 | 周期 | 重点工作 | 主要输出 | 阶段验收门 |
 | --- | --- | --- | --- |
-| W1～W3 | Jetson/L4T/CUDA/ARM64 审计；Runtime fork/commit；CMake `PRIVATE→PUBLIC` 修复；模型 Manifest、SHA-256、GGUF metadata；Tokenizer/chat template/特殊 Token/截断校验；固定构建和 Benchmark 脚本 | 环境与兼容矩阵、构建 Manifest、patch、模型清单、Tokenizer 校验记录、JSONL/CSV 基线 | 干净环境可构建；模型与输入链路可追溯；Prompt Token 计数一致；同一配置完成 warmup + 至少 5 次有效重复 |
-| W4～W6 | `EdgeOmniRuntime`；模型单例；文本生成；HTTP/JSON/SSE；request/session ID；队列、并发上限与背压；Cancel、Timeout、Context Reset、错误码；health/ready/model/metrics；fake backend 与 Jetson 集成测试 | C++ Runtime Adapter、API/请求响应 Schema、模型服务原型、单元测试与异常日志 | 上层不依赖上游内部对象；连续请求不重复加载；资源限制有效；取消/超时/异常有稳定错误码和可关联日志 |
-| W7～W8 | 37/37 CUDA Offload；UMA Prefill/Decode 分析；TTFT/TPOT/Throughput；`tegrastats`；Q4_K_M/Q8_0；KV Cache F16/Q8_0 与 Context 矩阵 | 性能基线报告、原始采样、量化/KV 对比报告 | 每项结论有固定配置、原始结果、统计值和失败/OOM 记录；不把墙钟时间冒充 TTFT/TPOT |
-| W9～W10 | VLM 图片输入与 Vision Encode；本地 PDF/Markdown/日志 RAG；文档片段引用；2～3 个受限只读工具；受控 Agent 检索决策、工具选择、Schema/权限校验和审计；基础 Session | 离线故障排查 POC、带引用报告、Agent/工具调用记录和审计日志 | 固定图片和故障案例可端到端运行；输出来源可定位；工具越权请求被拒绝；Agent 无任意执行权限 |
-| W11～W12 | L4T/CUDA/容器兼容矩阵；`nvpmodel` 与运行参数固化；模型只读挂载、Ready 门禁和 active/previous 回退；ARM64 Docker/systemd；冷启动、健康检查、日志、离线安装与异常恢复；模块交接 | 兼容矩阵、推荐配置、两套离线部署脚本、镜像 digest、启动/Ready/恢复记录、接口契约测试、问题清单和模块交接文档 | 两套脚本完成基础启停；主路径可断网安装和重启验证；模型损坏/进程退出有可解释结果；上层可按接口文档集成；不宣称生产级长稳或最终验收 |
+| W1 | Jetson/L4T/CUDA/ARM64 审计；Runtime fork/commit；CMake `PRIVATE→PUBLIC` 修复；模型 Manifest、SHA-256、GGUF metadata；Tokenizer/chat template 校验；固定构建、Benchmark 脚本和四模型选型 | 环境与兼容矩阵、构建 Manifest、patch、模型清单、JSONL/CSV 基线、模型选择报告 | 干净环境可构建；模型与输入链路可追溯；同一配置完成 warmup + 至少 5 次有效重复；冻结文本部署基线 |
+| W2～W4 | `EdgeOmniRuntime`；模型单例；文本生成；HTTP/JSON/SSE；request/session ID；队列、并发上限与背压；Cancel、Timeout、Context Reset、错误码；health/ready/model/metrics；fake backend 与 Jetson 集成测试 | C++ Runtime Adapter、API/请求响应 Schema、模型服务原型、单元测试与异常日志 | 上层不依赖上游内部对象；连续请求不重复加载；资源限制有效；取消/超时/异常有稳定错误码和可关联日志 |
+| W5～W6 | UMA Prefill/Decode 分析；TTFT/TPOT/Throughput；`tegrastats`；冻结主模型的 Q4_K_M/Q8_0；KV Cache F16/Q8_0 与 Context 矩阵 | 性能基线报告、原始采样、量化/KV 对比报告 | 每项结论有固定配置、原始结果、统计值和失败/OOM 记录；不把墙钟时间冒充 TTFT/TPOT |
+| W7～W8 | VLM 图片输入与 Vision Encode；固定设备图片/告警截图集与资源指标 | 图片推理、视觉指标、VLM 集成测试 | 固定图片集可稳定运行；视觉耗时和资源有结构化记录 |
+| W9～W10 | 本地 PDF/Markdown/日志 RAG；文档片段引用；2～3 个受限只读工具；受控 Agent、Schema/权限校验和审计；基础 Session | 离线故障排查 POC、带引用报告、Agent/工具调用记录和审计日志 | 输出来源可定位；工具越权请求被拒绝；Agent 无任意执行权限 |
+| W11 | L4T/CUDA/容器兼容矩阵；`nvpmodel` 与运行参数固化；模型只读挂载、Ready 门禁和 active/previous 回退；ARM64 Docker/systemd | 兼容矩阵、推荐配置、部署脚本、镜像 digest、启动/Ready/恢复记录 | 至少一个部署方式完成基础启停；另一个未完成项明确记录 |
+| W12 | 冷启动、健康检查、日志、离线安装与异常恢复；接口契约测试、问题清单和模块交接 | 模块交接文档、接口测试、已知限制与后续建议 | 主路径可断网安装和重启验证；不宣称生产级长稳或最终验收 |
 
 **模型范围控制：** W1～W3 可筛选 2～3 个 3B～4B 候选模型；正式 Q8_0、F16/BF16（如可加载）和 KV Cache 深度矩阵只对最终主模型开展。多测试几个模型用于选型是合理的，但不把所有模型都扩展到完整矩阵，以控制个人实习期工作范围并保证可比性。
 

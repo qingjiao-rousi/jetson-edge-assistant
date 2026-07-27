@@ -113,7 +113,7 @@
 | 稳定性与可运行性 | 15 | 5/5 有效运行且无加载/CUDA/OOM/不完整输出 15；4/5 10；其余先按硬淘汰处理。 |
 | 工程效率 | 15 | Prompt tokens/s 5、Decode tokens/s 5、峰值 RAM 3、峰值 GR3D/GPU/TJ/VDD_GPU_SOC 2；仅在同一任务、同一运行条件、同一统计口径下以未淘汰模型的相对排序赋分。 |
 
-两名人工评分者应先在不显示模型名称的输出副本上独立按 J-01--J-10 打分，再揭示模型名称、记录分歧和一致结论。评分表版本、Prompt ID、运行 ID、输出 SHA-256、每人分数、判据引用和分歧处理必须一并保存。模型名称、速度或初次结果出现后不得修改 Prompt、权重、通过线、权重或评分规则；任何协议变更只能新建 v2 并令 v1 结果不可混合。
+两次独立评分应先在不显示模型名称的输出副本上按 J-01--J-10 打分，再揭示模型名称、记录分歧和一致结论。评分者类型（人工或 AI）、评分表版本、Prompt ID、运行 ID、输出 SHA-256、每人分数、判据引用和分歧处理必须一并保存；AI 评分不得表述为人工盲评。模型名称、速度或初次结果出现后不得修改 Prompt、权重、通过线、权重或评分规则；任何协议变更只能新建 v2 并令 v1 结果不可混合。
 
 ## 10. 硬性淘汰条件
 
@@ -172,3 +172,18 @@ TTFT、TPOT、Prefill、DirectBackend Decode 字段在第一轮保持空值并�
 2. 预检已确认 Qwen3 `--reasoning off` 的 non-thinking 行为；若后续环境或 GGUF 改变，须重新预检，不通过则不得进入公平排名。
 3. 四个候选的加载/CUDA/完整输出预检已通过；任何 Runtime、CLI 或权重 hash 改变后都须重新执行，失败按第 10 节淘汰。
 4. 由人工确认后执行第一轮固定 Prompt 筛选；不得把预检或第一轮结果表述为 DirectBackend 验证。
+
+## 16. M4 第一轮结果与冻结结论
+
+| 项目 | 结果 | 状态 / 证据 |
+| --- | --- | --- |
+| 正式 run | `model-selection-v1-20260727T032850Z-14211` | 已确认；`analysis-v1/summary.json` |
+| 运行完整性 | 4 次 preconditioning、200/200 measured；每模型每 Prompt 5 次有效运行 | 已确认；`summary.json` 的 `complete=true` |
+| 离线 timing 更正 | 204/204 条记录从原始 stderr 重解析 | 已确认；不改变原始 `runs.jsonl` |
+| 盲评样本 | 39 个去重的 `prompt_id + response_sha256` 回答 | 已确认；`blind-review-unique.jsonl` |
+| 关联与计分 | v2 关联向全部来源运行传播；同模型同 Prompt 按 5 次实际输出频率加权，再按 10 个 Prompt 等权平均 | 已确认；`blind-review-associations-v2.json`、`score-merge-v2.json` |
+| 评分来源 | `scorer_a` 与 `scorer_b_ai` 两次独立规则评分；共有 9 个样本出现 1 分分歧 | 已确认；`score-merge-v2.json`。第二次是 AI 评分，不是人工评分。 |
+| 技术质量排名 | Qwen3 `2.90/5`、Qwen2.5 `2.70/5`、Llama-3.2 `2.05/5`、Phi-3.5 `1.80/5` | 已确认；`score-merge-v2.json` |
+| 部署许可 | Qwen3 为 Apache-2.0；Qwen2.5 商业授权待确认 | 已确认；第 4 节及 `score-merge-v2.json` |
+
+**冻结决定：**Qwen3-4B Q4_K_M（`Qwen/Qwen3-4B-GGUF@a9a60d009fa7ff9606305047c2bf77ac25dbec49`，SHA-256 `7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5`）冻结为**第一阶段部署基线**；Qwen2.5-3B Q4_K_M 保留为备选。冻结范围仅包括固定 `llama-cli`、SM87 CUDA build、`MODE_30W`、Q4_K_M 和本协议的单轮文本任务。它不是 DirectBackend、VLM、RAG、服务并发或生产验收结论。
