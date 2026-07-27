@@ -132,7 +132,12 @@ def workload(workload_id: str, config: dict[str, Any]) -> tuple[str, int]:
         prompt = "Provide a detailed but deterministic diagnostic report for this device. Cover operating state, thermal risk, memory pressure, GPU utilization, power mode, likely cause, verification steps, and remediation steps. Use numbered sections and do not reason aloud."
     else:
         line = "timestamp=2026-07-27 subsystem=gpu state=nominal temperature=55C memory=stable power=MODE_30W recommendation=continue-monitoring; "
-        prompt = "Analyze the following fixed device log and summarize anomalies and actions. Do not reason aloud.\n" + line * 150
+        # Keep the long workload below the fixed 4096-token context after
+        # adding the ChatML prompt wrapper and its 32-token response budget.
+        # The original 150 repetitions exceeded that budget on the real Qwen3
+        # tokenizer.  This frozen count targets the protocol's 1.9k-2.1k
+        # prompt-token range; the actual count is retained in every run record.
+        prompt = "Analyze the following fixed device log and summarize anomalies and actions. Do not reason aloud.\n" + line * item["log_repeat_count"]
     return prompt, item["max_new_tokens"]
 
 
@@ -142,7 +147,10 @@ def telemetry_peaks(path: Path) -> dict[str, int | None]:
     if path.is_file():
         for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
             for key, pattern in patterns.items():
-                match = re.search(pattern, line)
+                # Jetson releases differ in sensor-key capitalization
+                # (for example, gpu@/tj@ versus GPU@/TJ@).  Sensor names are
+                # case-insensitive here; numeric values and units remain exact.
+                match = re.search(pattern, line, flags=re.IGNORECASE)
                 if match:
                     values[key].append(round(float(match.group(1))))
     return {key: max(items) if items else None for key, items in values.items()}
@@ -181,6 +189,7 @@ def run_one(args: argparse.Namespace, validation: dict[str, Any], prompt_id: str
     if not record["valid"]:
         combined_error = (completed.stderr + " " + str(record.get("error_message", ""))).lower()
         if args.tegrastats and not telemetry_path.exists(): record["failure_class"] = "telemetry_missing"
+        elif record.get("code") == "context_limit" or "exceeds context" in combined_error: record["failure_class"] = "context_limit"
         elif "out of memory" in combined_error or "oom" in combined_error or "allocation" in combined_error: record["failure_class"] = "oom_or_allocation_failed"
         elif "cuda" in combined_error: record["failure_class"] = "cuda_error"
         elif record.get("finish_reason") == "timeout" or record.get("code") == "timeout": record["failure_class"] = "timeout"
@@ -191,7 +200,7 @@ def run_one(args: argparse.Namespace, validation: dict[str, Any], prompt_id: str
     return record
 
 
-def write_outputs(output_dir: Path, records: list[dict[str, Any]], plan: dict[str, Any]) -> None:
+def write_outputs(output_dir: Path, records: list[dict[str, Any]], plan: dict[str, Any]) -> dict[str, Any]:
     with (output_dir / "records.jsonl").open("w", encoding="utf-8") as stream:
         for record in records:
             stream.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -199,11 +208,29 @@ def write_outputs(output_dir: Path, records: list[dict[str, Any]], plan: dict[st
     with (output_dir / "summary.csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields); writer.writeheader(); writer.writerows({key: record.get(key) for key in fields} for record in records)
     valid = [record for record in records if record.get("valid") and record.get("phase") == "measured"]
-    summary = {"plan": plan, "attempted": len(records), "valid_measured": len(valid), "failed": len(records) - len(valid), "metrics": {}}
+    required = plan["required_valid_measured"]
+    by_workload: dict[str, dict[str, Any]] = {}
+    for prompt_id in plan["workloads"]:
+        measured = [record for record in records if record.get("phase") == "measured" and record.get("prompt_id") == prompt_id]
+        valid_count = sum(1 for record in measured if record.get("valid"))
+        failures: dict[str, int] = {}
+        for record in measured:
+            if not record.get("valid"):
+                failure = record.get("failure_class", "internal")
+                failures[failure] = failures.get(failure, 0) + 1
+        by_workload[prompt_id] = {
+            "attempted": len(measured),
+            "valid_measured": valid_count,
+            "required_valid_measured": required,
+            "complete": valid_count >= required,
+            "failure_classes": failures,
+        }
+    summary = {"plan": plan, "attempted": len(records), "valid_measured": len(valid), "failed": sum(1 for record in records if not record.get("valid")), "by_workload": by_workload, "complete": all(item["complete"] for item in by_workload.values()), "metrics": {}}
     for key in ("model_ready_ms", "prompt_tokens", "output_tokens", "prefill_ms", "decode_ms", "first_token_ms", "total_ms", "decode_tokens_per_second"):
         values = [float(record[key]) for record in valid if isinstance(record.get(key), (int, float))]
         summary["metrics"][key] = {"count": len(values), "mean": statistics.mean(values), "median": statistics.median(values)} if values else None
     (output_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return summary
 
 
 def main() -> int:
@@ -246,8 +273,8 @@ def main() -> int:
     for prompt_id in [item["id"] for item in args.config["workloads"]]:
         for attempt in range(1, preconditioning + 1): records.append(run_one(args, validation, prompt_id, "preconditioning", attempt, output_dir))
         for attempt in range(1, runs + 1): records.append(run_one(args, validation, prompt_id, "measured", attempt, output_dir))
-    write_outputs(output_dir, records, plan)
-    if sum(1 for record in records if record.get("phase") == "measured" and record.get("valid")) < runs * 3:
+    summary = write_outputs(output_dir, records, plan)
+    if not summary["complete"]:
         print("fewer than required valid measured runs; see records.jsonl", file=sys.stderr)
         return 2
     print(json.dumps({"status": "COMPLETE", "output_dir": str(output_dir), "valid_measured": runs * 3}))

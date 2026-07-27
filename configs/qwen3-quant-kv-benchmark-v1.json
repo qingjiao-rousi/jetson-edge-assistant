@@ -41,7 +41,7 @@
   "sampling": {"seed": 424242, "top_k": 1, "top_p": 1.0, "min_p": 0.0, "temperature": 0.0},
   "workloads": [
     {"id": "S", "prompt_tokens_target": [64, 128], "max_new_tokens": 32, "prompt_source": "fixed_device_status_short"},
-    {"id": "L", "prompt_tokens_target": [1900, 2100], "max_new_tokens": 32, "prompt_source": "fixed_device_log_template_repeated"},
+    {"id": "L", "prompt_tokens_target": [1900, 2100], "max_new_tokens": 32, "prompt_source": "fixed_device_log_template_repeated", "log_repeat_count": 75},
     {"id": "G", "prompt_tokens_target": [64, 128], "max_new_tokens": 256, "prompt_source": "fixed_structured_diagnosis"}
   ],
   "matrix": {
