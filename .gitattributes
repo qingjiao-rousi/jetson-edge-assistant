@@ -1,0 +1,2 @@
+# Preserve byte-exact upstream source and license archives.
+docs/evaluation/sources/** whitespace=-trailing-space

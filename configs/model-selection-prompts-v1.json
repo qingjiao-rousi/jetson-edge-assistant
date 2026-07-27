@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "protocol": "docs/evaluation/model-selection-v1.md",
+  "prompt_set_id": "model-selection-v1",
+  "n_predict": 128,
+  "prompts": [
+    {"id": "J-01", "text": "你是工业设备维护助手。离心泵运行 20 分钟后轴承温度从 58°C 升至 92°C，振动从 3.1 mm/s 升至 7.8 mm/s。请用中文给出最可能的两个原因，并分别说明一项现场核查。不要虚构已经测得的数据。", "automatic_checks": []},
+    {"id": "J-02", "text": "设备日志如下：\n[10:00:01] MOTOR_A current=18.2A temp=71C\n[10:00:05] MOTOR_A current=25.9A temp=78C alarm=OVERLOAD\n[10:00:08] VFD_A fault=OC\n[10:00:12] MOTOR_A stopped\n请定位最直接的故障链路，区分“日志直接支持”和“仍需检查”的内容，中文回答。", "automatic_checks": []},
+    {"id": "J-03", "text": "一台 380V 三相风机启动后 30 秒跳闸。请给出恰好 4 步、按安全优先顺序排列的排查建议。每一步必须包含“检查对象”和“判定动作”，不要给出带电拆线建议。", "automatic_checks": ["exact_four_steps"]},
+    {"id": "J-04", "text": "只知道“空压机压力波动”，没有压力曲线、阀门状态、排气温度或报警码。请回答：目前能确认什么、不能确认什么、下一步最需要哪 3 条数据。不要猜测具体故障。", "automatic_checks": []},
+    {"id": "J-05", "text": "仅输出一个 JSON 对象，不要 Markdown，不要解释。根据以下事实生成字段：device_id、severity、evidence、next_action。事实：设备 ID 为 P-17；报警为 HIGH_TEMP；记录温度 91°C；尚未确认根因。severity 只能是 low、medium、high；evidence 必须是字符串数组。", "automatic_checks": ["json_valid"]},
+    {"id": "J-06", "text": "You are given this fact: a 24 VDC sensor supply measures 23.9 V at the cabinet and 18.1 V at the field sensor while the sensor is connected. Give two likely fault locations and one safe measurement for each. Do not claim a failed component is confirmed.", "automatic_checks": []},
+    {"id": "J-07", "text": "请解释这句话中的术语并给出排查优先级：PLC shows a watchdog timeout after the HMI recipe download，现场同时报告“通信偶发中断”。用中文回答，但保留 PLC、watchdog、HMI、recipe 等英文术语。", "automatic_checks": []},
+    {"id": "J-08", "text": "仅依据以下上下文回答问题。\n上下文：维修手册片段 M-42：当液位开关 LS-2 持续为低位且泵 P-2 已停止时，控制器会禁止自动重启；推荐先检查液位、LS-2 接线和输入指示灯。\n问题：控制器为什么可能禁止 P-2 自动重启？下一步检查什么？如果上下文没有给出原因，请明确说“上下文未提供”。", "automatic_checks": []},
+    {"id": "J-09", "text": "Answer with exactly one word: READY", "automatic_checks": ["exact_ready_match"]},
+    {"id": "J-10", "text": "从以下交接记录中提取 JSON，字段必须为 alarm_time、device、confirmed_event、not_confirmed。\n记录：06:40 P-8 启动；06:47 操作员报告异响；06:49 PLC 报警 VIB_HIGH；06:50 P-8 停机；07:05 尚未完成轴承检查；07:10 未发现电机温度报警。\n只依据记录，alarm_time 使用 HH:MM，not_confirmed 为字符串数组。", "automatic_checks": ["json_valid"]}
+  ]
+}
