@@ -16,7 +16,11 @@
 namespace edgeomni {
 namespace {
 
-constexpr const char * kFrozenModelSha256 = "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5";
+// The benchmark admits only the two locally audited Qwen3 weight artifacts.
+// The expected hash is still supplied by the caller and checked against this
+// allow-list; arbitrary model files cannot enter the DirectBackend path.
+constexpr const char * kQwen3Q4ModelSha256 = "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5";
+constexpr const char * kQwen3Q8ModelSha256 = "c8aa2cf6a726855a9edbe70f6e372d351c51a48a69bfceecb070fe1d22b88f17";
 
 struct ModelDeleter {
     void operator()(llama_model * model) const { if (model) llama_model_free(model); }
@@ -113,8 +117,8 @@ Status DirectBackend::initialize(const RuntimeConfig & config) {
     if (config.model_path.empty() || !std::filesystem::exists(config.model_path)) {
         return {RuntimeErrorCode::kModelNotFound, "configured model does not exist"};
     }
-    if (config.expected_model_sha256 != kFrozenModelSha256) {
-        return {RuntimeErrorCode::kModelHashMismatch, "expected model hash is not the frozen Qwen3 baseline"};
+    if (config.expected_model_sha256 != kQwen3Q4ModelSha256 && config.expected_model_sha256 != kQwen3Q8ModelSha256) {
+        return {RuntimeErrorCode::kModelHashMismatch, "expected model hash is not an audited Qwen3 benchmark artifact"};
     }
     if (config.context_tokens == 0U || config.batch_tokens == 0U || config.ubatch_tokens == 0U) {
         return {RuntimeErrorCode::kInvalidArgument, "context, batch, and ubatch token counts must be non-zero"};

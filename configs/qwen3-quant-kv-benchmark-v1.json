@@ -52,5 +52,5 @@
   "repetitions": {"preconditioning": 1, "valid_measured": 5, "randomization_seed": 424242},
   "telemetry": {"command": "tegrastats", "interval_ms": 1000, "fields": ["ram_mb", "gr3d_percent", "gpu_temp_c", "tj_temp_c", "vdd_gpu_soc_mw", "kv_total_mib", "kv_k_mib", "kv_v_mib"]},
   "valid_run": {"finish_reasons": ["stop", "length"], "require_nonempty_output": true, "require_telemetry": true},
-  "failure_policy": {"keep_all_attempts": true, "exclude_failures_from_performance_statistics": true, "classes": ["preflight_unavailable", "metadata_mismatch", "template_mismatch", "model_load_failed", "context_limit", "oom_or_allocation_failed", "cuda_error", "decode_failed", "timeout", "cancelled", "incomplete_output", "workload_token_target_mismatch", "unsupported_kv_flash_attention", "telemetry_missing", "internal"]}
+  "failure_policy": {"keep_all_attempts": true, "exclude_failures_from_performance_statistics": true, "classes": ["preflight_unavailable", "metadata_mismatch", "template_mismatch", "model_load_failed", "model_hash_mismatch", "context_limit", "oom_or_allocation_failed", "cuda_error", "decode_failed", "timeout", "cancelled", "incomplete_output", "workload_token_target_mismatch", "unsupported_kv_flash_attention", "telemetry_missing", "internal"]}
 }

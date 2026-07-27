@@ -195,6 +195,7 @@ def run_one(args: argparse.Namespace, validation: dict[str, Any], prompt_id: str
         if args.tegrastats and not telemetry_path.exists(): record["failure_class"] = "telemetry_missing"
         elif record.get("code") == "context_limit" or "exceeds context" in combined_error: record["failure_class"] = "context_limit"
         elif "out of memory" in combined_error or "oom" in combined_error or "allocation" in combined_error: record["failure_class"] = "oom_or_allocation_failed"
+        elif "hash" in combined_error: record["failure_class"] = "model_hash_mismatch"
         elif "cuda" in combined_error: record["failure_class"] = "cuda_error"
         elif record.get("finish_reason") == "timeout" or record.get("code") == "timeout": record["failure_class"] = "timeout"
         elif record.get("finish_reason") == "cancelled" or record.get("code") == "cancelled": record["failure_class"] = "cancelled"
