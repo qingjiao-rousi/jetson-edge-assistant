@@ -20,7 +20,7 @@ namespace {
 // The expected hash is still supplied by the caller and checked against this
 // allow-list; arbitrary model files cannot enter the DirectBackend path.
 constexpr const char * kQwen3Q4ModelSha256 = "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5";
-constexpr const char * kQwen3Q8ModelSha256 = "c8aa2cf6a726855a9edbe70f6e372d351c51a48a69bfceecb070fe1d22b88f17";
+constexpr const char * kQwen3Q8ModelSha256 = "8c2f07f26af9747e41988551106f149b03eb9b5cb6df636027b6bf6278473300";
 
 struct ModelDeleter {
     void operator()(llama_model * model) const { if (model) llama_model_free(model); }
