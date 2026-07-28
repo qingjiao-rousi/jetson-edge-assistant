@@ -138,3 +138,23 @@ bytes、peak RAM MB、peak GR3D percent、peak GPU/TJ C、peak VDD_GPU_SOC mW、
 
 执行前须确认 Q8_0、F16、BF16 工件是否本地存在；缺失即保留矩阵行的 unavailable 状态。M6.2 才可在
 确认后实现 runner 或 DirectBackend KV config，本 M6.1 到此停止。
+
+## 8. M6.4a 结果可追溯性门禁
+
+`scripts/benchmark_qwen3_quant_kv.py` 在任何 `--execute` 前均重新读取并 SHA-256 校验本地
+Q4_K_M 和 Q8_0。因此即使一次调用只测其中一个权重，`plan.json`、每条 `records.jsonl`、每个
+run 的 `record.json`、`summary.csv` 和 `summary.json` 仍绑定同一对实际本地模型，而不是仅引用
+asset manifest 的旧记录。GGUF 记录仅包含版本、tensor 数、architecture、file type、quantization
+version、context/block count 及 chat-template 的存在性、字节数与指纹；不复制 template 原文。
+
+每个输出都包含同一不可变 `provenance` 和其 canonical JSON SHA-256。它记录主项目与 Runtime
+submodule 的 branch/commit/dirty state，脚本与 runner binary SHA-256，config、asset manifest、
+deployment baseline manifest SHA-256，以及两份模型的本地 SHA-256、字节数和上述 GGUF metadata。
+CSV 以扁平列保留这些字段和每份 GGUF metadata 的 canonical JSON，便于不解析 JSON 的对比工具
+筛选。runner 不存在或任何输入无法计算身份时，preflight 失败，不产生一个缺少 provenance 的 plan。
+
+该工具的唯一可执行 KV 路径是 `F16/F16`：M6.3 DirectBackend 尚未公开 K/V type override。每个
+产物明确写入该限制。`first_token_ms` 是 Runtime 本地 `generate_text` 的计时；服务 TTFT 仍定义为
+HTTP 接收至首个 token 成功写入客户端，两者不得互换。S/L/G 分组继续输出 `complete`、有效 measured
+样本数、要求的有效样本数、失败类别和逐次 prompt-token target 门禁结果；任一组不足 5 个有效样本
+时，整个结果 `complete=false`。

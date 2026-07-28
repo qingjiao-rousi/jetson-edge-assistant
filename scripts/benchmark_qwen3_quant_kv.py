@@ -91,6 +91,75 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def file_identity(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise RuntimeError(f"required file does not exist: {path}")
+    return {"path": str(path.resolve()), "sha256": sha256_file(path), "size_bytes": path.stat().st_size}
+
+
+def git_identity(path: Path) -> dict[str, Any]:
+    """Capture a repository/submodule identity, including a detached HEAD."""
+    def query(*argv: str) -> str:
+        result = subprocess.run(["git", "-C", str(path), *argv], capture_output=True, text=True, check=False)
+        if result.returncode:
+            raise RuntimeError(result.stderr.strip() or f"git {' '.join(argv)} failed")
+        return result.stdout.strip()
+
+    try:
+        return {
+            "path": str(path.resolve()),
+            "branch": query("branch", "--show-current") or None,
+            "commit": query("rev-parse", "HEAD"),
+            "dirty": bool(query("status", "--porcelain")),
+        }
+    except RuntimeError as error:
+        return {"path": str(path.resolve()), "branch": None, "commit": None, "dirty": None, "error": str(error)}
+
+
+def canonical_json_sha256(value: Any) -> str:
+    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def compact_model_metadata(validation: dict[str, Any]) -> dict[str, Any]:
+    """Retain finite GGUF gate values without embedding template source text."""
+    metadata = validation["metadata"]
+    values = metadata["metadata"]
+    return {
+        "gguf_version": metadata["gguf_version"], "tensor_count": metadata["tensor_count"],
+        "general.architecture": values.get("general.architecture"),
+        "general.file_type": values.get("general.file_type"),
+        "general.file_type_name": validation["file_type"],
+        "general.quantization_version": values.get("general.quantization_version"),
+        "qwen3.context_length": values.get("qwen3.context_length"),
+        "qwen3.block_count": values.get("qwen3.block_count"),
+        "tokenizer.chat_template_present": metadata["chat_template_present"],
+        "tokenizer.chat_template_bytes": metadata["chat_template_bytes"],
+        "tokenizer.chat_template_sha256": metadata["chat_template_sha256"],
+    }
+
+
+def build_provenance(config_path: Path, assets_path: Path, baseline_path: Path, runner_path: Path,
+                     validations: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """Build the immutable provenance block copied to all output artifacts."""
+    provenance = {
+        "schema_version": 1,
+        "project": git_identity(ROOT),
+        "runtime": git_identity(ROOT / "third_party/llama.cpp-omni"),
+        "tooling": {"benchmark_script": file_identity(Path(__file__)), "benchmark_runner": file_identity(runner_path)},
+        "inputs": {"config": file_identity(config_path), "asset_manifest": file_identity(assets_path), "deployment_baseline_manifest": file_identity(baseline_path)},
+        "models": {
+            model_id: {"path": validation["path"], "sha256": validation["sha256"], "size_bytes": validation["size_bytes"], "gguf_metadata": compact_model_metadata(validation), "verification": "computed_preflight"}
+            for model_id, validation in validations.items()
+        },
+        "runtime_contract": {
+            "kv_cache": {"k": "f16", "v": "f16", "only_supported_benchmark_path": True, "runtime_kv_override_supported": False},
+            "runtime_first_token_ms_is_service_ttft": False,
+        },
+    }
+    provenance["provenance_sha256"] = canonical_json_sha256(provenance)
+    return provenance
+
+
 def preflight(model_id: str, config: dict[str, Any], assets: dict[str, Any], baseline: dict[str, Any]) -> dict[str, Any]:
     expected_name = TYPES[model_id]
     asset = next((item for item in assets["assets"] if item["id"] == model_id), None)
@@ -156,7 +225,7 @@ def telemetry_peaks(path: Path) -> dict[str, int | None]:
     return {key: max(items) if items else None for key, items in values.items()}
 
 
-def run_one(args: argparse.Namespace, validation: dict[str, Any], prompt_id: str, phase: str, attempt: int, output_dir: Path) -> dict[str, Any]:
+def run_one(args: argparse.Namespace, validation: dict[str, Any], provenance: dict[str, Any], prompt_id: str, phase: str, attempt: int, output_dir: Path) -> dict[str, Any]:
     prompt, max_new_tokens = workload(prompt_id, args.config)
     run_dir = output_dir / phase / prompt_id / f"attempt-{attempt:02d}"
     run_dir.mkdir(parents=True, exist_ok=False)
@@ -177,7 +246,7 @@ def run_one(args: argparse.Namespace, validation: dict[str, Any], prompt_id: str
             telemetry.kill(); telemetry.wait(timeout=5)
     (run_dir / "stdout.log").write_text(completed.stdout, encoding="utf-8")
     (run_dir / "stderr.log").write_text(completed.stderr, encoding="utf-8")
-    record: dict[str, Any] = {"phase": phase, "prompt_id": prompt_id, "attempt": attempt, "model_id": args.model, "model_path": validation["path"], "model_sha256": validation["sha256"], "started_monotonic_ns": started, "ended_monotonic_ns": ended, "exit_code": completed.returncode, "telemetry_path": str(telemetry_path) if telemetry_path.exists() else None, "telemetry": telemetry_peaks(telemetry_path), "service_ttft_ms": None, "runtime_first_token_ms_is_not_service_ttft": True, "kv_cache": {"k": args.kv_k, "v": args.kv_v}, "power_mode_expected": {"name": args.config["fixed_runtime"]["nvpmodel_expected"], "id": args.config["fixed_runtime"]["nvpmodel_expected_id"]}}
+    record: dict[str, Any] = {"phase": phase, "prompt_id": prompt_id, "attempt": attempt, "model_id": args.model, "model_path": validation["path"], "model_sha256": validation["sha256"], "started_monotonic_ns": started, "ended_monotonic_ns": ended, "exit_code": completed.returncode, "telemetry_path": str(telemetry_path) if telemetry_path.exists() else None, "telemetry": telemetry_peaks(telemetry_path), "service_ttft_ms": None, "runtime_first_token_ms_is_not_service_ttft": True, "kv_cache": {"k": args.kv_k, "v": args.kv_v}, "power_mode_expected": {"name": args.config["fixed_runtime"]["nvpmodel_expected"], "id": args.config["fixed_runtime"]["nvpmodel_expected_id"]}, "provenance": provenance, "provenance_sha256": provenance["provenance_sha256"]}
     try:
         result = json.loads(completed.stdout.strip().splitlines()[-1])
         record.update(result)
@@ -207,12 +276,33 @@ def run_one(args: argparse.Namespace, validation: dict[str, Any], prompt_id: str
 
 
 def write_outputs(output_dir: Path, records: list[dict[str, Any]], plan: dict[str, Any]) -> dict[str, Any]:
+    provenance = plan["provenance"]
+    for record in records:
+        record.setdefault("provenance", provenance)
+        record.setdefault("provenance_sha256", provenance["provenance_sha256"])
     with (output_dir / "records.jsonl").open("w", encoding="utf-8") as stream:
         for record in records:
             stream.write(json.dumps(record, ensure_ascii=False) + "\n")
-    fields = ["phase", "prompt_id", "attempt", "model_id", "valid", "exit_code", "finish_reason", "prompt_tokens", "prompt_tokens_in_target", "output_tokens", "model_ready_ms", "prefill_ms", "decode_ms", "first_token_ms", "total_ms", "decode_tokens_per_second", "failure_class"]
+    fields = ["phase", "prompt_id", "attempt", "model_id", "valid", "exit_code", "finish_reason", "prompt_tokens", "prompt_tokens_in_target", "output_tokens", "model_ready_ms", "prefill_ms", "decode_ms", "first_token_ms", "total_ms", "decode_tokens_per_second", "failure_class", "provenance_sha256", "project_branch", "project_commit", "project_dirty", "runtime_branch", "runtime_commit", "runtime_dirty", "benchmark_script_sha256", "benchmark_runner_sha256", "config_sha256", "asset_manifest_sha256", "deployment_baseline_manifest_sha256", "q4_k_m_model_sha256", "q4_k_m_model_size_bytes", "q4_k_m_gguf_metadata", "q8_0_model_sha256", "q8_0_model_size_bytes", "q8_0_gguf_metadata"]
+
+    def csv_record(record: dict[str, Any]) -> dict[str, Any]:
+        row = {key: record.get(key) for key in fields}
+        row.update({
+            "provenance_sha256": provenance["provenance_sha256"],
+            "project_branch": provenance["project"]["branch"], "project_commit": provenance["project"]["commit"], "project_dirty": provenance["project"]["dirty"],
+            "runtime_branch": provenance["runtime"]["branch"], "runtime_commit": provenance["runtime"]["commit"], "runtime_dirty": provenance["runtime"]["dirty"],
+            "benchmark_script_sha256": provenance["tooling"]["benchmark_script"]["sha256"], "benchmark_runner_sha256": provenance["tooling"]["benchmark_runner"]["sha256"],
+            "config_sha256": provenance["inputs"]["config"]["sha256"], "asset_manifest_sha256": provenance["inputs"]["asset_manifest"]["sha256"], "deployment_baseline_manifest_sha256": provenance["inputs"]["deployment_baseline_manifest"]["sha256"],
+        })
+        for model_id in TYPES:
+            model = provenance["models"][model_id]
+            row[f"{model_id}_model_sha256"] = model["sha256"]
+            row[f"{model_id}_model_size_bytes"] = model["size_bytes"]
+            row[f"{model_id}_gguf_metadata"] = json.dumps(model["gguf_metadata"], ensure_ascii=False, sort_keys=True)
+        return row
+
     with (output_dir / "summary.csv").open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=fields); writer.writeheader(); writer.writerows({key: record.get(key) for key in fields} for record in records)
+        writer = csv.DictWriter(stream, fieldnames=fields); writer.writeheader(); writer.writerows(csv_record(record) for record in records)
     valid = [record for record in records if record.get("valid") and record.get("phase") == "measured"]
     required = plan["required_valid_measured"]
     by_workload: dict[str, dict[str, Any]] = {}
@@ -231,7 +321,7 @@ def write_outputs(output_dir: Path, records: list[dict[str, Any]], plan: dict[st
             "complete": valid_count >= required,
             "failure_classes": failures,
         }
-    summary = {"plan": plan, "attempted": len(records), "valid_measured": len(valid), "failed": sum(1 for record in records if not record.get("valid")), "by_workload": by_workload, "complete": all(item["complete"] for item in by_workload.values()), "metrics": {}}
+    summary = {"plan": plan, "provenance": provenance, "provenance_sha256": provenance["provenance_sha256"], "attempted": len(records), "valid_measured": len(valid), "failed": sum(1 for record in records if not record.get("valid")), "by_workload": by_workload, "complete": all(item["complete"] for item in by_workload.values()), "metrics": {}}
     for key in ("model_ready_ms", "prompt_tokens", "output_tokens", "prefill_ms", "decode_ms", "first_token_ms", "total_ms", "decode_tokens_per_second"):
         values = [float(record[key]) for record in valid if isinstance(record.get(key), (int, float))]
         summary["metrics"][key] = {"count": len(values), "mean": statistics.mean(values), "median": statistics.median(values)} if values else None
@@ -249,6 +339,7 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--runs", type=int, default=None)
     parser.add_argument("--preconditioning-runs", type=int, default=None)
+    parser.add_argument("--max-attempts", type=int, default=None, help="maximum attempts per workload phase; failed attempts are retained")
     parser.add_argument("--execute", action="store_true", help="run DirectBackend requests; without this flag only preflight/plan is written")
     parser.add_argument("--tegrastats", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--kv-k", choices=("f16", "q8_0", "q4_0"), default="f16")
@@ -256,29 +347,46 @@ def main() -> int:
     args = parser.parse_args()
     if args.kv_k != "f16" or args.kv_v != "f16":
         parser.error("current DirectBackend exposes no KV type override; only f16/f16 is executable in M6.3")
-    args.config = read_json(args.config); assets = read_json(args.assets_manifest); baseline = read_json(args.baseline)
-    validation = preflight(args.model, args.config, assets, baseline)
+    config_path, assets_path, baseline_path = args.config, args.assets_manifest, args.baseline
+    args.config = read_json(config_path); assets = read_json(assets_path); baseline = read_json(baseline_path)
+    # Rehash and parse both comparison artifacts on every invocation.  This
+    # makes a Q4-only or Q8-only run independently sufficient for final pairing.
+    validations = {model_id: preflight(model_id, args.config, assets, baseline) for model_id in TYPES}
+    validation = validations[args.model]
+    provenance = build_provenance(config_path, assets_path, baseline_path, Path(args.runner), validations)
     output_dir = args.output_dir or ROOT / "benchmark-results" / "qwen3-quant-kv" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     output_dir.mkdir(parents=True, exist_ok=False)
     runs = args.runs if args.runs is not None else args.config["repetitions"]["valid_measured"]
     preconditioning = args.preconditioning_runs if args.preconditioning_runs is not None else args.config["repetitions"]["preconditioning"]
+    max_attempts = args.max_attempts if args.max_attempts is not None else max(runs + 3, preconditioning + 1)
     if runs < 5 or preconditioning < 1:
         raise SystemExit("--runs must be at least 5 and --preconditioning-runs must be positive")
+    if max_attempts < max(runs, preconditioning):
+        raise SystemExit("--max-attempts must be at least the requested runs and preconditioning count")
     power_observed = None
     if args.execute and shutil.which("nvpmodel"):
         power_observed = subprocess.run([shutil.which("nvpmodel"), "-q"], capture_output=True, text=True, check=False).stdout.strip()
-    plan = {"model": validation, "workloads": [item["id"] for item in args.config["workloads"]], "preconditioning_runs": preconditioning, "required_valid_measured": runs, "execute": args.execute, "runtime_first_token_ms_is_not_service_ttft": True, "kv_cache": {"k": args.kv_k, "v": args.kv_v, "note": "DirectBackend currently uses public context defaults F16/F16; no Runtime KV override was added in M6.3."}, "power_mode_expected": {"name": args.config["fixed_runtime"]["nvpmodel_expected"], "id": args.config["fixed_runtime"]["nvpmodel_expected_id"]}, "power_mode_observed": power_observed}
+    plan = {"model": {key: value for key, value in validation.items() if key != "metadata"}, "workloads": [item["id"] for item in args.config["workloads"]], "preconditioning_runs": preconditioning, "required_valid_measured": runs, "max_attempts_per_phase": max_attempts, "execute": args.execute, "runtime_first_token_ms_is_not_service_ttft": True, "kv_cache": {"k": args.kv_k, "v": args.kv_v, "note": "Only F16/F16 is executable: DirectBackend exposes no KV type override."}, "power_mode_expected": {"name": args.config["fixed_runtime"]["nvpmodel_expected"], "id": args.config["fixed_runtime"]["nvpmodel_expected_id"]}, "power_mode_observed": power_observed, "provenance": provenance, "provenance_sha256": provenance["provenance_sha256"]}
     (output_dir / "plan.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if not args.execute:
         write_outputs(output_dir, [], plan)
         print(json.dumps({"status": "PREFLIGHT_READY", "output_dir": str(output_dir), "model": validation["file_type"]}))
         return 0
-    if not Path(args.runner).is_file():
-        raise SystemExit(f"DirectBackend runner missing: {args.runner}; build the benchmark target first")
     records = []
     for prompt_id in [item["id"] for item in args.config["workloads"]]:
-        for attempt in range(1, preconditioning + 1): records.append(run_one(args, validation, prompt_id, "preconditioning", attempt, output_dir))
-        for attempt in range(1, runs + 1): records.append(run_one(args, validation, prompt_id, "measured", attempt, output_dir))
+        # Jetson UMA allocation can fail intermittently. Keep every failed
+        # attempt, but retry until the required valid count or the explicit
+        # cap is reached so one transient allocation failure cannot invalidate
+        # an otherwise usable workload cell.
+        for phase, target in (("preconditioning", preconditioning), ("measured", runs)):
+            valid_count = 0
+            attempt = 0
+            while valid_count < target and attempt < max_attempts:
+                attempt += 1
+                record = run_one(args, validation, provenance, prompt_id, phase, attempt, output_dir)
+                records.append(record)
+                if record.get("valid"):
+                    valid_count += 1
     summary = write_outputs(output_dir, records, plan)
     if not summary["complete"]:
         print("fewer than required valid measured runs; see records.jsonl", file=sys.stderr)
