@@ -20,6 +20,7 @@ outputs/
 tmp/
 temp/
 *.tmp
+*.sqlite3
 *.swp
 *~
 

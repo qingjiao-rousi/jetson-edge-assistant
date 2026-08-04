@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1A-MD",
+  "status": "SUCCESS",
+  "retrieval_kind": "SQLite FTS5 keyword retrieval",
+  "semantic_embedding": false,
+  "model_inference_executed": false,
+  "tokenizer_executed": true,
+  "document": {
+    "document_id": "AX17-MANUAL-001",
+    "revision": "1",
+    "source_path": "knowledge/manuals/ax17-equipment-manual.md",
+    "content_sha256": "e7d77a33de83ad7ea1aaf58e33376d9b086d05f9fb3df53fd7a5463e825bb213",
+    "title": "AX-17 Industrial Compressor Manual",
+    "language": "en",
+    "classification": "synthetic-test-data"
+  },
+  "document_count": 1,
+  "chunk_count": 4,
+  "chunks": [
+    {"chunk_id": "AX17-MANUAL-001#technical-specifications", "ordinal": 1, "token_count": 32, "text_sha256": "4c8385a1f05d8a09eed765251d30eae7bb93c8c0a62fabf9f7ac49293d6b2dd3"},
+    {"chunk_id": "AX17-MANUAL-001#alarm-e42", "ordinal": 2, "token_count": 28, "text_sha256": "33cc7ca1894f40057ecb1e87cc66fcea1d2a6de94d32ea518a9023d48b2f666d"},
+    {"chunk_id": "AX17-MANUAL-001#maintenance-schedule", "ordinal": 3, "token_count": 12, "text_sha256": "2e7100d66ffdde8e3c9672e916bd8bdbe946fd4056f1c47ae4afa8558574f4e4"},
+    {"chunk_id": "AX17-MANUAL-001#reset-procedure", "ordinal": 4, "token_count": 27, "text_sha256": "b97e06a81c903ba309b1e284c65a63d4262fcdd491804248b48aa28a94d0cdd8"}
+  ],
+  "total_chunk_tokens": 99,
+  "generated_index": {"path": "generated/rag-m9.1a/ax17.sqlite3", "size_bytes": 40960, "committed": false},
+  "question_results": [
+    {"query": "What is the nominal pressure?", "answerable": true, "top_chunk_id": "AX17-MANUAL-001#technical-specifications"},
+    {"query": "What does alarm E42 mean?", "answerable": true, "top_chunk_id": "AX17-MANUAL-001#alarm-e42"},
+    {"query": "How often is inspection required?", "answerable": true, "top_chunk_id": "AX17-MANUAL-001#maintenance-schedule"},
+    {"query": "How long should reset be held?", "answerable": true, "top_chunk_id": "AX17-MANUAL-001#reset-procedure"},
+    {"query": "What is the rated torque?", "answerable": true, "top_chunk_id": "AX17-MANUAL-001#technical-specifications"},
+    {"query": "What is the hydraulic oil grade?", "answerable": false, "results": [], "citations": []}
+  ],
+  "citation_integrity": true,
+  "repeat_build_manifest_equal": true,
+  "absolute_paths_in_index": false,
+  "conclusion": "single synthetic Markdown keyword-retrieval MVP; no generated answer, semantic retrieval, or model-grounding claim"
+}

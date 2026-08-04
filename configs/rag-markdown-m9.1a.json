@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1A-MD",
+  "source_path": "knowledge/manuals/ax17-equipment-manual.md",
+  "document_id": "AX17-MANUAL-001",
+  "revision": "1",
+  "language": "en",
+  "classification": "synthetic-test-data",
+  "retrieval": {"implementation": "SQLite FTS5", "kind": "keyword", "default_top_k": 3},
+  "tokenizer": {
+    "binary": "third_party/llama.cpp-omni/build-jetson-release/bin/llama-tokenize",
+    "model": "models/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf",
+    "arguments": ["--stdin", "--ids", "--no-bos", "--log-disable"]
+  },
+  "generated_database": "generated/rag-m9.1a/ax17.sqlite3",
+  "database_committed": false
+}

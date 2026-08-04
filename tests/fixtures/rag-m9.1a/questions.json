@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "questions": [
+    {"query": "What is the nominal pressure?", "expected_chunk_id": "AX17-MANUAL-001#technical-specifications"},
+    {"query": "What does alarm E42 mean?", "expected_chunk_id": "AX17-MANUAL-001#alarm-e42"},
+    {"query": "How often is inspection required?", "expected_chunk_id": "AX17-MANUAL-001#maintenance-schedule"},
+    {"query": "How long should reset be held?", "expected_chunk_id": "AX17-MANUAL-001#reset-procedure"},
+    {"query": "What is the rated torque?", "expected_chunk_id": "AX17-MANUAL-001#technical-specifications"},
+    {"query": "What is the hydraulic oil grade?", "expected_chunk_id": null}
+  ]
+}
