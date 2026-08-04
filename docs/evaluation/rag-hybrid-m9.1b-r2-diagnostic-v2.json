@@ -1,0 +1,257 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1B-R2",
+  "phase": "DIAGNOSTIC_DEV",
+  "status": "DIAGNOSTIC_ONLY",
+  "dataset_path": "tests/fixtures/rag-m9.1b/evaluation-set.json",
+  "dataset_sha256": "fb795f82a9b9b7e837513427cfd3f5795ac9c5c871e3f662be1f6ae0249ea436",
+  "quality_gate": {
+    "mode": "hybrid",
+    "minimum_recall_at_1": 0.75,
+    "minimum_recall_at_3": 0.875,
+    "minimum_mrr": 0.8,
+    "minimum_no_answer_correct_rejection_rate": 0.75,
+    "maximum_false_positive_count": 1
+  },
+  "quality_gate_result": {
+    "passed": false,
+    "checks": {
+      "recall_at_1": true,
+      "recall_at_3": true,
+      "mrr": true,
+      "no_answer_correct_rejection_rate": false,
+      "false_positive_count": false
+    }
+  },
+  "quality_metrics": {
+    "sample_count": 12,
+    "answerable_count": 8,
+    "no_answer_count": 4,
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "mrr": 1.0,
+    "no_answer_correct_rejection_rate": 0.5,
+    "false_positive_count": 2,
+    "questions": [
+      {
+        "id": "eval-ax-torque",
+        "query": "What is the rated shaft torque of AX-17?",
+        "expected_chunk_id": "AX17-MANUAL-001#technical-specifications",
+        "answerable": true,
+        "returned_chunk_ids": [
+          "AX17-MANUAL-001#technical-specifications",
+          "AX17-MANUAL-001#maintenance-schedule",
+          "AX17-MANUAL-001#reset-procedure"
+        ],
+        "rank": 1,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.75846037,
+          "keyword_coverage": 1.0,
+          "margin": 0.01665785
+        }
+      },
+      {
+        "id": "eval-ax-inspection",
+        "query": "How frequently is scheduled AX-17 inspection required?",
+        "expected_chunk_id": "AX17-MANUAL-001#maintenance-schedule",
+        "answerable": true,
+        "returned_chunk_ids": [
+          "AX17-MANUAL-001#maintenance-schedule",
+          "AX17-MANUAL-001#alarm-e42",
+          "AX17-MANUAL-001#reset-procedure"
+        ],
+        "rank": 1,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.81971247,
+          "keyword_coverage": 0.5,
+          "margin": 0.00103285
+        }
+      },
+      {
+        "id": "eval-ax-e42-distractor",
+        "query": "On AX-17, is E42 a cooling-flow or motor-temperature fault?",
+        "expected_chunk_id": "AX17-MANUAL-001#alarm-e42",
+        "answerable": true,
+        "returned_chunk_ids": [
+          "AX17-MANUAL-001#alarm-e42"
+        ],
+        "rank": 1,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.77035733,
+          "keyword_coverage": 0.4,
+          "margin": 0.03278689
+        }
+      },
+      {
+        "id": "eval-bx-pressure",
+        "query": "What is the BX-9 nominal outlet pressure?",
+        "expected_chunk_id": "BX9-MANUAL-001#technical-specifications",
+        "answerable": true,
+        "returned_chunk_ids": [
+          "BX9-MANUAL-001#technical-specifications",
+          "BX9-MANUAL-001#cavitation-warning",
+          "BX9-MANUAL-001#maintenance-schedule"
+        ],
+        "rank": 1,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.75136375,
+          "keyword_coverage": 1.0,
+          "margin": 0.00078484
+        }
+      },
+      {
+        "id": "eval-bx-temperature",
+        "query": "What fluid temperature range is permitted for BX-9?",
+        "expected_chunk_id": "BX9-MANUAL-001#technical-specifications",
+        "answerable": true,
+        "returned_chunk_ids": [
+          "BX9-MANUAL-001#technical-specifications",
+          "BX9-MANUAL-001#alarm-e42",
+          "BX9-MANUAL-001#maintenance-schedule"
+        ],
+        "rank": 1,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.70769575,
+          "keyword_coverage": 1.0,
+          "margin": 0.00052882
+        }
+      },
+      {
+        "id": "eval-bx-bubbles",
+        "query": "What should be inspected when vapor formation disrupts BX-9 suction flow?",
+        "expected_chunk_id": "BX9-MANUAL-001#cavitation-warning",
+        "answerable": true,
+        "returned_chunk_ids": [
+          "BX9-MANUAL-001#cavitation-warning",
+          "BX9-MANUAL-001#maintenance-schedule",
+          "BX9-MANUAL-001#alarm-e42"
+        ],
+        "rank": 1,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.61663061,
+          "keyword_coverage": 0.16666667,
+          "margin": 0.01665785
+        }
+      },
+      {
+        "id": "eval-ct-t17-en",
+        "query": "What does tracking warning T17 indicate on CT-4?",
+        "expected_chunk_id": "CT4-MANUAL-001#belt-tracking",
+        "answerable": true,
+        "returned_chunk_ids": [
+          "CT4-MANUAL-001#belt-tracking",
+          "CT4-MANUAL-001#chinese-operator-note"
+        ],
+        "rank": 1,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.78436434,
+          "keyword_coverage": 0.66666667,
+          "margin": 0.01665785
+        }
+      },
+      {
+        "id": "eval-ct-maintenance",
+        "query": "When are CT-4 belt tension and alignment inspected?",
+        "expected_chunk_id": "CT4-MANUAL-001#maintenance-schedule",
+        "answerable": true,
+        "returned_chunk_ids": [
+          "CT4-MANUAL-001#maintenance-schedule",
+          "CT4-MANUAL-001#belt-tracking",
+          "CT4-MANUAL-001#chinese-operator-note"
+        ],
+        "rank": 1,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.82329593,
+          "keyword_coverage": 0.75,
+          "margin": 0.00052882
+        }
+      },
+      {
+        "id": "eval-no-ax-viscosity",
+        "query": "What lubricant viscosity is required by AX-17?",
+        "expected_chunk_id": null,
+        "answerable": true,
+        "returned_chunk_ids": [
+          "AX17-MANUAL-001#alarm-e42",
+          "AX17-MANUAL-001#maintenance-schedule",
+          "AX17-MANUAL-001#technical-specifications"
+        ],
+        "rank": null,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.46570758,
+          "keyword_coverage": 0.33333333,
+          "margin": 0.015625
+        }
+      },
+      {
+        "id": "eval-no-bx-reset",
+        "query": "What is the BX-9 emergency-stop reset sequence?",
+        "expected_chunk_id": null,
+        "answerable": true,
+        "returned_chunk_ids": [
+          "BX9-MANUAL-001#alarm-e42",
+          "BX9-MANUAL-001#maintenance-schedule",
+          "BX9-MANUAL-001#cavitation-warning"
+        ],
+        "rank": null,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.54312156,
+          "keyword_coverage": 0.25,
+          "margin": 0.01665785
+        }
+      },
+      {
+        "id": "eval-no-ct-e42-zh",
+        "query": "CT-4 的 E42 故障码表示什么？",
+        "expected_chunk_id": null,
+        "answerable": false,
+        "returned_chunk_ids": [],
+        "rank": null,
+        "admission": {
+          "passed": false,
+          "reasons": [
+            "no_candidate_satisfies_hard_constraints"
+          ]
+        }
+      },
+      {
+        "id": "eval-no-ct-bearing-zh",
+        "query": "CT-4 轴承规定多少小时更换？",
+        "expected_chunk_id": null,
+        "answerable": false,
+        "returned_chunk_ids": [],
+        "rank": null,
+        "admission": {
+          "passed": false,
+          "reasons": [
+            "keyword_coverage_below_threshold"
+          ],
+          "vector_score": 0.66025534,
+          "keyword_coverage": 0.0,
+          "margin": 0.00026441
+        }
+      }
+    ]
+  },
+  "prohibition": "This inspected R1 evaluation set is diagnostic/dev only and is not an independent final result."
+}

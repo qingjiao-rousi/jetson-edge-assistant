@@ -1,0 +1,9 @@
+# M9.1B-R2 Evaluation: PARTIAL
+
+R2 keeps R1 commit `ec92a2b` intact and keeps the audited Qwen3-Embedding-0.6B Q8_0 asset unchanged. It replaces R1's `1/rank` confidence with hard device/fault constraints, RRF candidate ranking, and a separate vector/coverage/margin admission gate. Indexed document text now has stable `Document`, `Device`, `Section`, and `Content` fields. SQLite FTS5 `unicode61` is verified during build, with offline Chinese bigram expansion recorded as `unicode61-cjk-bigram-v1`.
+
+The initial 64-candidate calibration and its diagnostic are retained as `rag-hybrid-m9.1b-r2-calibration.json` and `rag-hybrid-m9.1b-r2-diagnostic.json`. After diagnostic/dev analysis, the expanded 80-candidate calibration froze `minimum_keyword_coverage=0.10`; the complete unchanged quality gate passed on calibration with Recall@1/3 and MRR `1.0`, rejection `1.0`, and zero false positives. The frozen v2 artifact is [rag-hybrid-m9.1b-r2-calibration-v2.json](rag-hybrid-m9.1b-r2-calibration-v2.json).
+
+The former R1 final set was already inspected, so R2 records it only as diagnostic/dev. Its v2 result is Recall@1 `1.0`, Recall@3 `1.0`, MRR `1.0`, but rejection `0.50` and two false positives. It fails the unchanged rejection and false-positive gates; see [rag-hybrid-m9.1b-r2-diagnostic-v2.json](rag-hybrid-m9.1b-r2-diagnostic-v2.json). This is not a final claim and was not used to lower a gate.
+
+The new holdout is content-frozen before execution at SHA-256 `d5c6948795ed24f9c6ba078cfdbab659bc798b8efa4f5f3aabc26abd8576d41f`, recorded in [rag-hybrid-m9.1b-r2-holdout-manifest.json](rag-hybrid-m9.1b-r2-holdout-manifest.json). Its state is `NOT_RUN`. Because the diagnostic gate remains failed, R2 remains `PARTIAL`; no holdout execution, persistent embedding backend work, M9.2 transition, quality-gate reduction, or final-set answer changes are authorized.

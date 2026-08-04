@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1B-R2",
+  "split": "frozen-holdout-not-yet-executed",
+  "questions": [
+    {"id":"holdout-ax-maintenance","query":"At what operating-hour interval is AX-17 scheduled inspection due?","expected_chunk_id":"AX17-MANUAL-001#maintenance-schedule","answerable":true,"category":"exact-fact"},
+    {"id":"holdout-ax-e42","query":"For AX-17, what condition does E42 report?","expected_chunk_id":"AX17-MANUAL-001#alarm-e42","answerable":true,"category":"device-fault-constraint"},
+    {"id":"holdout-bx-temperature","query":"State the allowed BX-9 fluid temperature limits.","expected_chunk_id":"BX9-MANUAL-001#technical-specifications","answerable":true,"category":"exact-fact"},
+    {"id":"holdout-bx-e42","query":"BX-9 E42 concerns which component temperature?","expected_chunk_id":"BX9-MANUAL-001#alarm-e42","answerable":true,"category":"device-fault-constraint"},
+    {"id":"holdout-ct-chinese","query":"CT-4 的 T17 跑偏报警应检查什么？","expected_chunk_id":"CT4-MANUAL-001#chinese-operator-note","answerable":true,"category":"chinese-boundary"},
+    {"id":"holdout-ct-reset","query":"How many seconds is the CT-4 blue reset key pressed?","expected_chunk_id":"CT4-MANUAL-001#emergency-stop-reset","answerable":true,"category":"exact-fact"},
+    {"id":"holdout-no-ax-e42","query":"Does AX-17 E42 specify a motor winding temperature?","expected_chunk_id":null,"answerable":false,"category":"unsupported-device-fault"},
+    {"id":"holdout-no-ct-e42","query":"CT-4 的 E42 故障码是什么意思？","expected_chunk_id":null,"answerable":false,"category":"missing-fault-code"}
+  ]
+}
