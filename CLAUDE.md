@@ -1,14 +1,17 @@
-# Jetson 端侧离线多模态推理与设备故障辅助系统 — CLAUDE.md
+# Jetson 工业现场多模态交互与故障辅助系统 — CLAUDE.md
 
 > 本文档供 Claude Code 及其他 AI 编码助手使用，自动加载为会话上下文。
 
 ## 项目身份
 
-**项目名称**: Jetson 端侧离线多模态推理与设备故障辅助系统
+**完整项目名称**: Jetson 工业现场实时音视频全双工多模态交互与离线设备知识检索及故障辅助系统
+**本仓库模块**: Jetson 端侧离线 LLM/VLM Runtime 与设备故障辅助后端
+**项目性质**: 基于开源 `llama.cpp-omni` 固定 fork 的 Jetson 二次开发
+**最终功能**: 工业现场实时音视频全双工多模态交互，以及离线设备知识检索与故障辅助
 **硬件平台**: Jetson AGX Orin 32GB
 **核心能力**: 离线 LLM/VLM 推理、GGUF/量化、KV Cache、Prefill/Decode、本地 RAG、受限工具和 systemd/Docker 部署
-**当前状态**: LLM、CUDA 全层 offload 和 Jetson 指标基线已验证；固定 benchmark、自有 Runtime、VLM、RAG 和部署待实现
-**项目周期**: 三个月业务主线；蒸馏或剪枝仅作为独立个人研究扩展
+**当前状态**: M1～M8 已收口；文本 Runtime、量化基线、VLM 单图 Runtime 与应用 API 已验证；当前进入 M9 RAG，M9.1A 关键词检索 MVP 已完成
+**项目周期**: 三个月端侧 Runtime/故障辅助主线；音视频全双工由其他模块并行集成；蒸馏或剪枝仅作为独立个人研究扩展
 
 ## 设计文档
 
@@ -16,7 +19,7 @@
 
 - [业务背景、范围和成果表述边界](md/项目背景.md)
 - [项目概述与模块设计](md/项目实践-jetson端侧离线多模态智能助手.md)
-- [任务需求与技术设计说明](md/项目实践-jetson端侧离线多模态智能助手-任务需求与技术设计说明.md)
+- [任务需求与技术设计说明](md/项目实践-jetson端侧任务需求.md)
 - [三个月开发计划与执行清单](md/三个月开发计划与执行清单.md)
 
 ## 参考上游项目
@@ -58,7 +61,7 @@
 - **llama.cpp-omni** — 当前快照只用于基线；正式 Runtime 修改进入个人 fork，自有接口位于 `runtime/` 或 `app/backend/`
 - **autonomous-intelligence** — 借鉴其持续对话、记忆摘要、事件驱动服务拆分的架构思路，用本地组件替代云端依赖（Pinecone→本地向量库、OpenAI→本地模型、Whisper→faster-whisper 等）
 
-## 项目代码组织（设计阶段）
+## 项目代码组织
 
 ```
 vlmllm-main/
@@ -94,10 +97,10 @@ vlmllm-main/
 
 | 阶段 | 内容 | 当前状态 |
 |------|------|---------|
-| 一：基线 | 环境、构建、模型、CUDA offload、原始日志 | 基本完成，待固定 benchmark 和源码追溯 |
-| 二：自有 Runtime | Backend、生命周期、流式、超时、取消、metrics | 待开始 |
-| 三：量化性能 | Q4/Q8、KV Cache、Prefill/Decode | 待开始 |
-| 四：业务闭环 | VLM 图片、本地 RAG、受限工具 | 待开始 |
+| 一：基线 | 环境、构建、模型、CUDA offload、原始日志 | 已完成并收口 |
+| 二：自有 Runtime | Backend、生命周期、流式、超时、取消、metrics | 已完成 M5 阶段验收 |
+| 三：量化性能 | Q4/Q8、KV Cache、Prefill/Decode | 已完成 M6 冻结；KV 固定 F16/F16 |
+| 四：业务闭环 | VLM 图片、本地 RAG、受限工具 | VLM/M8 已收口；RAG M9.1A 进行中；工具未开始 |
 | 五：生产化 | systemd/Docker、健康检查、回滚、长稳 | 待开始 |
 | 独立研究 | 蒸馏或结构化剪枝二选一 | 非业务承诺，待选题 |
 
@@ -130,4 +133,8 @@ vlmllm-main/
 6. **离线替换提醒** — 如果拟议的方案中出现了云端依赖（OpenAI API、Pinecone 等），主动提醒并给出本地替代建议
 7. **性能结论要实测** — 涉及模型速度、显存、精度等性能判断时，必须基于实际测量数据，不能推测
 8. **先设计再实现** — 涉及新模块或多文件修改时，先输出接口设计让用户确认，再写实现代码
-9. **保持上游分离** — 自有代码写在 `app/` 下，不修改 `../llama.cpp-omni-master/` 或 `../autonomous-intelligence-main/`
+9. **保持上游分离** — 自有代码写在 `runtime/`、`scripts/` 或后续 `app/` 下，不直接修改 `third_party/llama.cpp-omni`、`../llama.cpp-omni-master/` 或 `../autonomous-intelligence-main/`
+
+当前项目状态统一查阅 [md/总结.md](md/总结.md)。本文件和历史设计文档中的阶段
+描述如与该总结冲突，以总结的状态日期为准；冻结实验事实仍以对应 evaluation
+报告为准。
