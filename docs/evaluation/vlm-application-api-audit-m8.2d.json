@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "milestone": "M8.2-D",
+  "status": "ROOT_CAUSE_CONFIRMED_AND_OFFLINE_FIX_VALIDATED",
+  "historical_evidence_modified": false,
+  "inference_executed": false,
+  "root_cause": {
+    "classification": "request_rejected",
+    "reproduced_http_status": 400,
+    "reproduced_error_code": "invalid_argument",
+    "reproduced_error_message": "invalid max_new_tokens",
+    "detail": "M8.1 normalization encoded max_new_tokens as a signed JSON integer while the shared parser requires unsigned"
+  },
+  "fixed_validation": {
+    "loopback_test_really_executed": true,
+    "http_status": 200,
+    "fake_backend_generate_call_count": 1,
+    "sse_order": ["metadata", "token", "token", "token", "done"],
+    "terminal_count": 1
+  },
+  "corrected_historical_ledger": {
+    "service_process_start_count": 1,
+    "application_request_attempt_count": 1,
+    "backend_generate_invoked": false,
+    "inference_run_count": 0,
+    "retry_count": 0
+  },
+  "decision_gate": "M8.2-R may be proposed but was not executed"
+}

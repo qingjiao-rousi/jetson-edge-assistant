@@ -19,6 +19,7 @@ Status FakeBackend::initialize(const RuntimeConfig & config) {
     }
     initialized_ = true;
     request_count_ = 0;
+    generate_call_count_ = 0;
     return Status::Ok();
 }
 
@@ -29,6 +30,8 @@ GenerateResponse FakeBackend::generate_text(const GenerateRequest & request, con
     std::shared_ptr<std::atomic_bool> active_flag;
     {
         std::lock_guard<std::mutex> lock(mutex_);
+        ++generate_call_count_;
+        last_request_ = request;
         if (!initialized_) {
             response.code = RuntimeErrorCode::kInvalidState;
             response.error_message = "FakeBackend is not initialized";
@@ -113,5 +116,8 @@ void FakeBackend::set_test_delay_ms(uint32_t delay_ms) {
     std::lock_guard<std::mutex> lock(mutex_);
     test_delay_ms_ = delay_ms;
 }
+
+unsigned int FakeBackend::generate_call_count() const { std::lock_guard<std::mutex> lock(mutex_); return generate_call_count_; }
+GenerateRequest FakeBackend::last_request() const { std::lock_guard<std::mutex> lock(mutex_); return last_request_; }
 
 }  // namespace edgeomni

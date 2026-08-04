@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "edgeomni/chat_template_renderer.h"
+#include "llama_backend_lifecycle.h"
 #include "llama.h"
 
 namespace edgeomni {
@@ -37,10 +38,6 @@ struct BatchOwner {
     llama_batch batch{};
 };
 
-std::mutex g_backend_mutex;
-bool g_backend_initialized = false;
-size_t g_backend_users = 0;
-
 struct RequestControl {
     std::atomic_bool cancelled{false};
     std::atomic<std::atomic_bool *> external_cancel{nullptr};
@@ -58,14 +55,6 @@ bool abort_callback(void * data) {
     if (external != nullptr && external->load()) return true;
     const int64_t deadline = control->deadline_ns.load();
     return deadline != 0 && steady_now_ns() >= deadline;
-}
-
-void release_backend_if_unused() {
-    std::lock_guard<std::mutex> backend_lock(g_backend_mutex);
-    if (g_backend_users == 0U && g_backend_initialized) {
-        llama_backend_free();
-        g_backend_initialized = false;
-    }
 }
 
 RuntimeErrorCode decode_code(int32_t result) {
@@ -124,20 +113,16 @@ Status DirectBackend::initialize(const RuntimeConfig & config) {
         return {RuntimeErrorCode::kInvalidArgument, "context, batch, and ubatch token counts must be non-zero"};
     }
 
-    {
-        std::lock_guard<std::mutex> backend_lock(g_backend_mutex);
-        if (!g_backend_initialized) {
-            llama_backend_init();
-            g_backend_initialized = true;
-        }
-    }
+    const Status backend_status = acquire_llama_backend();
+    if (!backend_status.ok()) return backend_status;
+    impl_->backend_acquired = true;
 
     llama_model_params model_params = llama_model_default_params();
     model_params.n_gpu_layers = config.gpu_layers;
     model_params.use_mmap = config.use_mmap;
     impl_->model.reset(llama_model_load_from_file(config.model_path.c_str(), model_params));
     if (!impl_->model) {
-        release_backend_if_unused();
+        release_llama_backend(); impl_->backend_acquired = false;
         return {RuntimeErrorCode::kModelLoadFailed, "llama_model_load_from_file returned null"};
     }
 
@@ -147,7 +132,7 @@ Status DirectBackend::initialize(const RuntimeConfig & config) {
                                                    : Status{RuntimeErrorCode::kTemplateUnsupported, "model has no default chat template"};
     if (!template_status.ok()) {
         impl_->model.reset();
-        release_backend_if_unused();
+        release_llama_backend(); impl_->backend_acquired = false;
         return template_status;
     }
 
@@ -162,14 +147,14 @@ Status DirectBackend::initialize(const RuntimeConfig & config) {
     impl_->context.reset(llama_init_from_model(impl_->model.get(), context_params));
     if (!impl_->context) {
         impl_->model.reset();
-        release_backend_if_unused();
+        release_llama_backend(); impl_->backend_acquired = false;
         return {RuntimeErrorCode::kContextCreateFailed, "llama_init_from_model returned null"};
     }
     impl_->vocab = llama_model_get_vocab(impl_->model.get());
     if (!impl_->vocab) {
         impl_->context.reset();
         impl_->model.reset();
-        release_backend_if_unused();
+        release_llama_backend(); impl_->backend_acquired = false;
         return {RuntimeErrorCode::kInternal, "llama_model_get_vocab returned null"};
     }
     impl_->config = config;
@@ -177,11 +162,6 @@ Status DirectBackend::initialize(const RuntimeConfig & config) {
     impl_->model_ready_ms = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - started).count());
     impl_->initialized = true;
-    {
-        std::lock_guard<std::mutex> backend_lock(g_backend_mutex);
-        ++g_backend_users;
-        impl_->backend_acquired = true;
-    }
     return Status::Ok();
 }
 
@@ -191,6 +171,12 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
     GenerateResponse response;
     response.request_id = request.request_id;
     response.metrics.model_ready_ms = impl_->model_ready_ms;
+    if (!request.images.empty()) {
+        response.code = RuntimeErrorCode::kInvalidArgument;
+        response.error_message = "DirectBackend does not support images; use the VLM adapter backend";
+        response.finish_reason = "error";
+        return response;
+    }
     if (!impl_->initialized) {
         response.code = RuntimeErrorCode::kInvalidState;
         response.error_message = "DirectBackend is not initialized";
@@ -430,13 +416,8 @@ Status DirectBackend::shutdown() {
     impl_->vocab = nullptr;
     impl_->initialized = false;
     if (impl_->backend_acquired) {
-        std::lock_guard<std::mutex> backend_lock(g_backend_mutex);
-        --g_backend_users;
+        release_llama_backend();
         impl_->backend_acquired = false;
-        if (g_backend_users == 0U && g_backend_initialized) {
-            llama_backend_free();
-            g_backend_initialized = false;
-        }
     }
     return Status::Ok();
 }

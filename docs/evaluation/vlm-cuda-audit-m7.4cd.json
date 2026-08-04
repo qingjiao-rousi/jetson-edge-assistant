@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "milestone": "M7.4C-D",
+  "audit_mode": "READ_ONLY_NO_MODEL_LOAD_NO_INFERENCE",
+  "host_cuda_preflight": {
+    "status": "PASSED",
+    "device_nodes": ["/dev/nvhost-gpu", "/dev/nvmap", "/dev/nvidiactl", "/dev/nvidia0"],
+    "jetpack": "R36.4.7",
+    "driver": "NVIDIA UNIX Open Kernel Module 540.4.0",
+    "list_devices": "CUDA0: Orin (30697 MiB, 20062 MiB free)"
+  },
+  "sandbox_cuda_preflight": {
+    "status": "FAILED_BY_ISOLATION",
+    "observed": ["GPU device nodes absent", "ggml_cuda_init unknown error", "--list-devices returned no device"],
+    "root_cause": "The M7.4C process was launched in a sandbox whose /dev isolation hid Jetson GPU device nodes."
+  },
+  "assets_and_runtime": {
+    "status": "UNCHANGED",
+    "runtime_commit": "19cc26967140407efe34006a355ab445b35b16ac",
+    "runtime_worktree_dirty": false,
+    "llama_mtmd_cli_sha256": "454227ac3ea4b07631e3da62cec1157f8e75442e1d3fe8c02aece2d1759168d0",
+    "llama_tokenize_sha256": "1012999431de6d4f778759f7e6464e7f9578b3a8fe2f620dbf8af3aa563b2b03",
+    "main_model_sha256": "d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12",
+    "mmproj_sha256": "980c9b2f78c04e6cff93d277ada09e768394f112d75db3b4e9dea8a69f9fb904"
+  },
+  "resources": {
+    "uma_total_mb": 30697,
+    "available_mb": 20141,
+    "swap_used_bytes": 0,
+    "residual_llama_or_tegrastats_processes": false
+  },
+  "root_cause_classification": {
+    "environment_unavailable": "CONFIRMED_FOR_SANDBOX_ONLY",
+    "driver_runtime": "NOT_INDICATED_ON_HOST",
+    "resource_contention": "NOT_INDICATED",
+    "process_cleanup": "M7.4C runner finalization was interrupted; independent recovery runner added and tested",
+    "runner_internal": "NOT_THE_CUDA_ROOT_CAUSE"
+  },
+  "decision_gate": {
+    "m7_4c_r_eligible_after_confirmation": true,
+    "m7_4c_r_would_be_second_inference_attempt": true,
+    "parameters_must_remain_unchanged": true,
+    "execute_32768": false,
+    "default_development_context_remains": 8192
+  }
+}

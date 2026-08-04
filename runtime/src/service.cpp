@@ -1,6 +1,7 @@
 #include "edgeomni/service.h"
 
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
@@ -14,8 +15,6 @@
 namespace edgeomni {
 namespace {
 using json = nlohmann::json;
-
-constexpr const char * kFrozenHash = "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5";
 
 int http_code(RuntimeErrorCode code) {
     switch (code) {
@@ -42,16 +41,25 @@ const char * code_name(RuntimeErrorCode code) {
 json metrics_json(const RuntimeMetrics & m) {
     return {{"model_ready_ms", m.model_ready_ms}, {"prompt_tokens", m.prompt_tokens},
             {"output_tokens", m.output_tokens}, {"prefill_ms", m.prefill_ms},
+            {"image_preprocess_ms", m.image_preprocess_ms}, {"vision_encode_ms", m.vision_encode_ms},
+            {"image_embedding_ms", m.image_embedding_ms},
             {"decode_ms", m.decode_ms}, {"total_ms", m.total_ms},
-            {"first_token_ms", m.first_token_ms},
+            {"first_token_ms", m.first_token_ms}, {"ttft_ms", m.ttft_ms}, {"tpot_ms", m.tpot_ms},
             {"decode_tokens_per_second", m.decode_tokens_per_second}};
+}
+
+json measurement_status(const RuntimeMetrics & m) {
+    return {{"image_preprocess_ms", m.image_preprocess_ms ? "measured" : "not_measured"},
+            {"vision_encode_ms", m.vision_encode_ms ? "measured" : "not_measured"},
+            {"image_embedding_ms", m.image_embedding_ms ? "measured" : "not_measured"}};
 }
 
 json response_json(const GenerateResponse & r, const std::string & hash) {
     json out = {{"request_id", r.request_id}, {"session_id", nullptr}, {"model_sha256", hash},
                 {"text", r.text}, {"finish_reason", r.finish_reason},
                 {"prompt_tokens", r.prompt_tokens}, {"output_tokens", r.generated_tokens},
-                {"metrics", metrics_json(r.metrics)}, {"error", nullptr}};
+                {"image_tokens", r.image_tokens},
+                {"metrics", metrics_json(r.metrics)}, {"measurement_status", measurement_status(r.metrics)}, {"error", nullptr}};
     if (r.code != RuntimeErrorCode::kOk) out["error"] = {{"code", code_name(r.code)}, {"message", r.error_message}};
     return out;
 }
@@ -65,9 +73,25 @@ bool has_only(const json & object, std::initializer_list<const char *> allowed) 
     return true;
 }
 
+bool decode_base64_strict(const std::string & input, uint64_t maximum, std::vector<uint8_t> * output) {
+    if (input.empty() || input.find("data:") == 0 || input.find("://") != std::string::npos) return false;
+    if (input.size() % 4U != 0U || input.size() / 4U * 3U > maximum + 2U) return false;
+    auto value = [](unsigned char c) -> int { if (c >= 'A' && c <= 'Z') return c - 'A'; if (c >= 'a' && c <= 'z') return c - 'a' + 26; if (c >= '0' && c <= '9') return c - '0' + 52; if (c == '+') return 62; if (c == '/') return 63; return -1; };
+    output->clear(); output->reserve(input.size() / 4U * 3U);
+    for (size_t i = 0; i < input.size(); i += 4U) {
+        const int a = value(input[i]), b = value(input[i + 1U]); const int c = input[i + 2U] == '=' ? -2 : value(input[i + 2U]); const int d = input[i + 3U] == '=' ? -2 : value(input[i + 3U]);
+        if (a < 0 || b < 0 || (c < 0 && c != -2) || (d < 0 && d != -2) || (c == -2 && d != -2) || ((c == -2 || d == -2) && i + 4U != input.size())) return false;
+        output->push_back(static_cast<uint8_t>((a << 2) | (b >> 4)));
+        if (c != -2) output->push_back(static_cast<uint8_t>((b << 4) | (c >> 2)));
+        if (d != -2) output->push_back(static_cast<uint8_t>((c << 6) | d));
+        if (output->size() > maximum) return false;
+    }
+    return true;
+}
+
 bool parse_request(const json & body, GenerateRequest * request, bool * stream, const std::string & expected_hash,
                   std::string * error) {
-    if (!body.is_object() || !has_only(body, {"request_id", "session_id", "messages", "max_new_tokens", "timeout_ms", "stream", "model_sha256", "sampling"})) {
+    if (!body.is_object() || !has_only(body, {"request_id", "session_id", "messages", "max_new_tokens", "timeout_ms", "stream", "model_sha256", "sampling", "images"})) {
         *error = "invalid JSON object or unknown field"; return false;
     }
     if (!body.contains("request_id") || !body["request_id"].is_string() || body["request_id"].get<std::string>().empty()) {
@@ -94,6 +118,15 @@ bool parse_request(const json & body, GenerateRequest * request, bool * stream, 
         if (s.contains("seed") && !s["seed"].is_number_integer()) { *error = "invalid seed"; return false; } if (s.contains("seed")) request->sampling.seed = s["seed"].get<uint32_t>();
         if (s.contains("top_k") && (!s["top_k"].is_number_integer() || s["top_k"].get<int64_t>() < 0)) { *error = "invalid top_k"; return false; } if (s.contains("top_k")) request->sampling.top_k = s["top_k"].get<int32_t>();
         if (s.contains("top_p")) request->sampling.top_p = s["top_p"].get<float>(); if (s.contains("min_p")) request->sampling.min_p = s["min_p"].get<float>(); if (s.contains("temperature")) request->sampling.temperature = s["temperature"].get<float>();
+    }
+    if (body.contains("images")) {
+        if (!body["images"].is_array() || body["images"].size() > 1U) { *error = "images must contain at most one item"; return false; }
+        for (const auto & image : body["images"]) {
+            if (!image.is_object() || !has_only(image, {"id", "mime", "data_base64"}) || !image.contains("id") || !image.contains("mime") || !image.contains("data_base64") || !image["id"].is_string() || !image["mime"].is_string() || !image["data_base64"].is_string()) { *error = "invalid image object"; return false; }
+            ImageInput decoded; decoded.id = image["id"].get<std::string>(); decoded.mime_type = image["mime"].get<std::string>();
+            if (!decode_base64_strict(image["data_base64"].get<std::string>(), 10U * 1024U * 1024U, &decoded.encoded_bytes)) { *error = "invalid or oversized image base64"; return false; }
+            request->images.push_back(std::move(decoded));
+        }
     }
     request->cancel_flag = std::make_shared<std::atomic_bool>(false);
     return true;
@@ -128,15 +161,26 @@ RuntimeService::RuntimeService(std::shared_ptr<RuntimeBackend> backend) : impl_(
     s.Get("/model/info", [this](const httplib::Request &, httplib::Response & res) { std::lock_guard<std::mutex> l(impl_->mutex); res.set_content(json({{"model_name", impl_->config.model_name}, {"model_sha256", impl_->config.model_sha256}, {"template_fingerprint", impl_->config.template_fingerprint}, {"context_capacity", impl_->config.context_capacity}}).dump(), "application/json"); });
     s.Get("/metrics", [this](const httplib::Request &, httplib::Response & res) { std::lock_guard<std::mutex> l(impl_->mutex); auto m = json({{"accepted", impl_->accepted.load()}, {"completed", impl_->completed.load()}, {"cancelled", impl_->cancelled.load()}, {"timeout", impl_->timed_out.load()}, {"errors", impl_->errors.load()}, {"active", impl_->active.empty() ? 0 : 1}, {"queue_depth", 0}, {"token_count", impl_->token_count.load()}, {"service_ttft_ms", impl_->last_service_ttft_ms}, {"service_tpot_ms", impl_->last_service_tpot_ms}, {"last", metrics_json(impl_->last_metrics)}}); res.set_content(m.dump(), "application/json"); });
     s.Post(R"(/v1/cancel/(.*))", [this](const httplib::Request & req, httplib::Response & res) { const std::string id = req.matches.size() > 1 ? req.matches[1].str() : ""; const Status st = impl_->backend->cancel_request(id); if (!st.ok()) { res.status = 404; } else { res.set_content(json({{"request_id", id}, {"cancelled", true}}).dump(), "application/json"); } });
-    auto handler = [this](const httplib::Request & req, httplib::Response & res) {
+    auto handler = [this](const httplib::Request & req, httplib::Response & res, bool application_diagnosis_route) {
         json body; try { body = json::parse(req.body); } catch (...) { res.status = 400; res.set_content(R"({"error":{"code":"invalid_json","message":"invalid JSON"}})", "application/json"); return; }
+        // M8.1 application-facing single-image diagnosis contract. It normalizes
+        // into the existing RuntimeService request shape; image decoding remains shared.
+        if (application_diagnosis_route) {
+            if (!body.is_object() || !has_only(body, {"request_id", "prompt", "images", "stream"}) || !body.contains("prompt") || !body["prompt"].is_string() || !body.contains("images")) {
+                res.status = 400; res.set_content(R"({"error":{"code":"invalid_argument","message":"invalid diagnosis request"}})", "application/json"); return;
+            }
+            json normalized = {{"request_id", body.value("request_id", "diagnose-image")}, {"messages", {{{"role", "user"}, {"content", body["prompt"]}}}}, {"images", body["images"]}, {"max_new_tokens", static_cast<uint32_t>(128)}, {"stream", body.value("stream", false)}};
+            body = std::move(normalized);
+        }
         GenerateRequest request; bool stream = false; std::string error;
         if (!parse_request(body, &request, &stream, impl_->config.model_sha256, &error)) { res.status = 400; res.set_content(json({{"error", {{"code", "invalid_argument"}, {"message", error}}}}).dump(), "application/json"); return; }
         { std::lock_guard<std::mutex> l(impl_->mutex); if (!impl_->initialized || impl_->stopping) { res.status = 503; return; } if (impl_->seen.count(request.request_id)) { res.status = 409; return; } if (!impl_->active.empty()) { res.status = 429; return; } impl_->seen.insert(request.request_id); impl_->active = request.request_id; impl_->accepted.fetch_add(1); }
-        if (stream) { res.set_chunked_content_provider("text/event-stream", [this, request](size_t, httplib::DataSink & sink) mutable { bool disconnected = false; bool got_token = false; uint64_t first_write = 0; uint64_t last_write = 0; const auto accepted_at = std::chrono::steady_clock::now(); auto emit = [&](const char * event, const json & data) { if (disconnected) return false; const std::string payload = std::string("event: ") + event + "\ndata: " + data.dump() + "\n\n"; if (!sink.write(payload.data(), payload.size())) { disconnected = true; request.cancel_flag->store(true); return false; } return true; }; GenerateResponse out = impl_->backend->generate_text(request, [&](const StreamToken & t) { const bool written = emit("token", json({{"request_id", t.request_id}, {"session_id", nullptr}, {"index", t.index}, {"text", t.text}})); if (written) { const uint64_t now = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - accepted_at).count()); if (!got_token) { first_write = now; got_token = true; } last_write = now; impl_->token_count.fetch_add(1); } return written; }); if (!disconnected) { const char * event = out.finish_reason == "cancelled" ? "cancelled" : out.finish_reason == "timeout" ? "timeout" : out.code == RuntimeErrorCode::kOk ? "done" : "error"; emit(event, response_json(out, impl_->config.model_sha256)); } { std::lock_guard<std::mutex> l(impl_->mutex); impl_->last_service_ttft_ms = got_token ? first_write : 0; impl_->last_service_tpot_ms = got_token && out.generated_tokens > 1 ? (last_write - first_write) / (out.generated_tokens - 1) : 0; } impl_->finish(out); sink.done(); return true; }); res.set_header("Cache-Control", "no-cache"); res.set_header("Connection", "keep-alive"); return; }
+        if (stream) { res.set_chunked_content_provider("text/event-stream", [this, request](size_t, httplib::DataSink & sink) mutable { bool disconnected = false; bool got_token = false; uint64_t first_write = 0; uint64_t last_write = 0; const auto accepted_at = std::chrono::steady_clock::now(); auto emit = [&](const char * event, const json & data) { if (disconnected) return false; const std::string payload = std::string("event: ") + event + "\ndata: " + data.dump() + "\n\n"; if (!sink.write(payload.data(), payload.size())) { disconnected = true; request.cancel_flag->store(true); return false; } return true; }; emit("metadata", json({{"request_id", request.request_id}, {"image_tokens", nullptr}, {"image_metrics", {{"image_preprocess_ms", nullptr}, {"vision_encode_ms", nullptr}, {"image_embedding_ms", nullptr}}}, {"measurement_status", "not_measured_before_backend"}})); GenerateResponse out = impl_->backend->generate_text(request, [&](const StreamToken & t) { const bool written = emit("token", json({{"request_id", t.request_id}, {"session_id", nullptr}, {"index", t.index}, {"text", t.text}})); if (written) { const uint64_t now = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - accepted_at).count()); if (!got_token) { first_write = now; got_token = true; } last_write = now; impl_->token_count.fetch_add(1); } return written; }); if (!disconnected) { const char * event = out.finish_reason == "cancelled" ? "cancelled" : out.finish_reason == "timeout" ? "timeout" : out.code == RuntimeErrorCode::kOk ? "done" : "error"; emit(event, response_json(out, impl_->config.model_sha256)); } { std::lock_guard<std::mutex> l(impl_->mutex); impl_->last_service_ttft_ms = got_token ? first_write : 0; impl_->last_service_tpot_ms = got_token && out.generated_tokens > 1 ? (last_write - first_write) / (out.generated_tokens - 1) : 0; } impl_->finish(out); sink.done(); return true; }); res.set_header("Cache-Control", "no-cache"); res.set_header("Connection", "keep-alive"); return; }
         GenerateResponse out = impl_->backend->generate_text(request); impl_->finish(out); res.status = out.code == RuntimeErrorCode::kOk ? 200 : http_code(out.code); res.set_content(response_json(out, impl_->config.model_sha256).dump(), "application/json");
     };
-    s.Post("/v1/generate", handler); s.Post("/v1/chat", handler);
+    s.Post("/v1/generate", [handler](const httplib::Request & req, httplib::Response & res) { handler(req, res, false); });
+    s.Post("/v1/chat", [handler](const httplib::Request & req, httplib::Response & res) { handler(req, res, false); });
+    s.Post("/v1/diagnose/image", [handler](const httplib::Request & req, httplib::Response & res) { handler(req, res, true); });
 }
 
 void RuntimeService::Impl::finish(const GenerateResponse & out) {
@@ -144,7 +188,7 @@ void RuntimeService::Impl::finish(const GenerateResponse & out) {
 }
 
 RuntimeService::~RuntimeService() { shutdown(); }
-Status RuntimeService::initialize(const ServiceConfig & config) { std::lock_guard<std::mutex> l(impl_->mutex); if (impl_->initialized) return {RuntimeErrorCode::kAlreadyInitialized, "service already initialized"}; if (config.model_sha256 != kFrozenHash) return {RuntimeErrorCode::kModelHashMismatch, "service model hash mismatch"}; const Status st = impl_->backend->initialize(config.runtime); if (!st.ok()) return st; impl_->config = config; impl_->initialized = true; impl_->stopping = false; return Status::Ok(); }
+Status RuntimeService::initialize(const ServiceConfig & config) { std::lock_guard<std::mutex> l(impl_->mutex); if (impl_->initialized) return {RuntimeErrorCode::kAlreadyInitialized, "service already initialized"}; if (config.model_sha256.empty() || config.model_sha256 != config.runtime.expected_model_sha256) return {RuntimeErrorCode::kModelHashMismatch, "service model hash must match RuntimeConfig"}; const Status st = impl_->backend->initialize(config.runtime); if (!st.ok()) return st; impl_->config = config; impl_->initialized = true; impl_->stopping = false; return Status::Ok(); }
 Status RuntimeService::start(const std::string & host, int port) { std::lock_guard<std::mutex> l(impl_->mutex); if (!impl_->initialized || impl_->running) return {RuntimeErrorCode::kInvalidState, "service is not ready to start"}; if (!impl_->server->bind_to_port(host, port)) return {RuntimeErrorCode::kInternal, "failed to bind HTTP server"}; impl_->running = true; impl_->thread = std::thread([this] { impl_->server->listen_after_bind(); std::lock_guard<std::mutex> l(impl_->mutex); impl_->running = false; }); return Status::Ok(); }
 Status RuntimeService::stop() { { std::lock_guard<std::mutex> l(impl_->mutex); if (!impl_->running) return Status::Ok(); impl_->stopping = true; } impl_->server->stop(); if (impl_->thread.joinable()) impl_->thread.join(); return Status::Ok(); }
 Status RuntimeService::shutdown() { stop(); std::unique_lock<std::mutex> l(impl_->mutex); impl_->stopping = true; impl_->idle.wait(l, [this] { return impl_->active.empty(); }); if (!impl_->initialized) return Status::Ok(); const Status st = impl_->backend->shutdown(); impl_->initialized = false; return st; }

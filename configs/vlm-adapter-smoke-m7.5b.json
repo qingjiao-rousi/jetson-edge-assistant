@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "milestone": "M7.5B",
+  "runtime_commit": "19cc26967140407efe34006a355ab445b35b16ac",
+  "default_context": 8192,
+  "experimental_contexts": [16384],
+  "disabled_contexts": [32768],
+  "attempt_policy": {"max_model_process_starts": 1, "retries": 0},
+  "request": {"image_count": 1, "mime_type": "image/jpeg", "max_image_bytes": 10485760, "max_width": 4096, "max_height": 4096, "max_pixels": 16777216, "batch": 512, "ubatch": 512, "gpu_layers": 99, "flash_attention": true, "temperature": 0, "seed": 424242, "max_new_tokens": 128},
+  "assets": {"model": {"path": "models/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf", "size_bytes": 1929901056, "sha256": "d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12"}, "mmproj": {"path": "models/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf", "size_bytes": 844757728, "sha256": "980c9b2f78c04e6cff93d277ada09e768394f112d75db3b4e9dea8a69f9fb904"}}
+}

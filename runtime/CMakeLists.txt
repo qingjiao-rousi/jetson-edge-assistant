@@ -5,6 +5,9 @@ set(EDGEOMNI_LLAMA_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llama
 
 find_library(EDGEOMNI_LLAMA_LIBRARY NAMES llama libllama.so
     PATHS "${EDGEOMNI_LLAMA_BUILD_DIR}/bin" NO_DEFAULT_PATH REQUIRED)
+find_library(EDGEOMNI_MTMD_LIBRARY NAMES mtmd libmtmd.so
+    PATHS "${EDGEOMNI_LLAMA_BUILD_DIR}/bin" NO_DEFAULT_PATH REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 # The frozen upstream build creates target `llama` (src/CMakeLists.txt:11-55).
 # Its build-tree package is not relocatable, so import the verified build artifact directly.
@@ -13,16 +16,26 @@ set_target_properties(edgeomni_llama PROPERTIES
     IMPORTED_LOCATION "${EDGEOMNI_LLAMA_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES
         "${EDGEOMNI_LLAMA_INCLUDE_DIR};${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llama.cpp-omni/ggml/include")
+add_library(edgeomni_mtmd SHARED IMPORTED GLOBAL)
+set_target_properties(edgeomni_mtmd PROPERTIES
+    IMPORTED_LOCATION "${EDGEOMNI_MTMD_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES
+        "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llama.cpp-omni/tools/mtmd;${EDGEOMNI_LLAMA_INCLUDE_DIR};${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llama.cpp-omni/ggml/include")
 
 message(STATUS "EdgeOmni frozen llama include: ${EDGEOMNI_LLAMA_INCLUDE_DIR}")
 message(STATUS "EdgeOmni frozen llama library: ${EDGEOMNI_LLAMA_LIBRARY}")
+message(STATUS "EdgeOmni frozen mtmd library: ${EDGEOMNI_MTMD_LIBRARY}")
 
 add_library(edgeomni_runtime STATIC
     src/chat_template_renderer.cpp
-    src/direct_backend.cpp)
+    src/llama_backend_lifecycle.cpp
+    src/direct_backend.cpp
+    src/mtmd_backend.cpp
+    src/vlm_input_validator.cpp
+    src/vlm_asset_verifier.cpp)
 target_compile_features(edgeomni_runtime PUBLIC cxx_std_17)
 target_include_directories(edgeomni_runtime PUBLIC include)
-target_link_libraries(edgeomni_runtime PRIVATE edgeomni_llama)
+target_link_libraries(edgeomni_runtime PRIVATE edgeomni_llama edgeomni_mtmd OpenSSL::Crypto)
 
 add_library(edgeomni_fake_backend STATIC src/fake_backend.cpp)
 target_compile_features(edgeomni_fake_backend PUBLIC cxx_std_17)
@@ -50,6 +63,16 @@ if(EDGEOMNI_BUILD_BENCHMARK_TOOLS)
     target_link_libraries(edgeomni_qwen3_benchmark_runner PRIVATE edgeomni_runtime)
     set_target_properties(edgeomni_qwen3_benchmark_runner PROPERTIES
         BUILD_RPATH "${EDGEOMNI_LLAMA_BUILD_DIR}/bin")
+    add_executable(edgeomni_vlm_adapter_smoke_runner tools/vlm_adapter_smoke_runner.cpp)
+    target_compile_features(edgeomni_vlm_adapter_smoke_runner PRIVATE cxx_std_17)
+    target_link_libraries(edgeomni_vlm_adapter_smoke_runner PRIVATE edgeomni_runtime)
+    set_target_properties(edgeomni_vlm_adapter_smoke_runner PROPERTIES
+        BUILD_RPATH "${EDGEOMNI_LLAMA_BUILD_DIR}/bin")
+    add_executable(edgeomni_vlm_service_host tools/vlm_service_host.cpp)
+    target_compile_features(edgeomni_vlm_service_host PRIVATE cxx_std_17)
+    target_link_libraries(edgeomni_vlm_service_host PRIVATE edgeomni_service)
+    set_target_properties(edgeomni_vlm_service_host PROPERTIES
+        BUILD_RPATH "${EDGEOMNI_LLAMA_BUILD_DIR}/bin")
 endif()
 
 if(EDGEOMNI_BUILD_TESTS)
@@ -61,6 +84,14 @@ if(EDGEOMNI_BUILD_TESTS)
     target_compile_features(edgeomni_service_unit_test PRIVATE cxx_std_17)
     target_link_libraries(edgeomni_service_unit_test PRIVATE edgeomni_service edgeomni_fake_backend edgeomni_cpp_httplib)
     add_test(NAME edgeomni_service_unit_test COMMAND edgeomni_service_unit_test)
+    add_executable(edgeomni_vlm_contract_unit_test tests/vlm_contract_unit_test.cpp)
+    target_compile_features(edgeomni_vlm_contract_unit_test PRIVATE cxx_std_17)
+    target_link_libraries(edgeomni_vlm_contract_unit_test PRIVATE edgeomni_runtime edgeomni_fake_backend)
+    add_test(NAME edgeomni_vlm_contract_unit_test COMMAND edgeomni_vlm_contract_unit_test)
+    add_executable(edgeomni_mtmd_backend_unit_test tests/mtmd_backend_unit_test.cpp)
+    target_compile_features(edgeomni_mtmd_backend_unit_test PRIVATE cxx_std_17)
+    target_link_libraries(edgeomni_mtmd_backend_unit_test PRIVATE edgeomni_runtime)
+    add_test(NAME edgeomni_mtmd_backend_unit_test COMMAND edgeomni_mtmd_backend_unit_test)
 endif()
 
 if(EDGEOMNI_BUILD_INTEGRATION)

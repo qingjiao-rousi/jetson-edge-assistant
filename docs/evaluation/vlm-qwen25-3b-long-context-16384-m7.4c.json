@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "milestone": "M7.4C",
+  "status": "FAILED",
+  "result_artifact": "benchmark-results/vlm-long-context-16384/20260730-052012-814635-0400/result.json",
+  "inference_run_count": 1,
+  "retry_count": 0,
+  "context": 16384,
+  "raw_fixture_tokens": 13301,
+  "cli_prompt_tokens": null,
+  "image_tokens": 391,
+  "kv_cache_mib": 576.0,
+  "cuda_initialization": "FAILED",
+  "failure_class": "cuda_initialization_failed",
+  "exit_code": null,
+  "output_correctness": "NOT_EVALUABLE",
+  "conclusions_not_supported": ["16384 capacity success", "performance", "stability", "deployment readiness", "32768 capability"]
+}

@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "milestone": "M7.4B",
+  "status": "ACTIVE_SINGLE_RUN_PROTOCOL",
+  "runtime": {
+    "path": "third_party/llama.cpp-omni",
+    "commit": "19cc26967140407efe34006a355ab445b35b16ac"
+  },
+  "binaries": {
+    "inference": {
+      "path": "third_party/llama.cpp-omni/build-jetson-release/bin/llama-mtmd-cli",
+      "size_bytes": 67520,
+      "sha256": "454227ac3ea4b07631e3da62cec1157f8e75442e1d3fe8c02aece2d1759168d0"
+    },
+    "tokenizer": {
+      "path": "third_party/llama.cpp-omni/build-jetson-release/bin/llama-tokenize",
+      "size_bytes": 29040,
+      "sha256": "1012999431de6d4f778759f7e6464e7f9578b3a8fe2f620dbf8af3aa563b2b03"
+    }
+  },
+  "assets": {
+    "main_model": {
+      "path": "models/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf",
+      "size_bytes": 1929901056,
+      "sha256": "d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12"
+    },
+    "mmproj": {
+      "path": "models/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf",
+      "size_bytes": 844757728,
+      "sha256": "980c9b2f78c04e6cff93d277ada09e768394f112d75db3b4e9dea8a69f9fb904"
+    },
+    "image": {
+      "path": "third_party/llama.cpp-omni/tools/mtmd/test-1.jpeg",
+      "size_bytes": 124071,
+      "sha256": "2dff664c0c8aaea18aff8cbe7e868845b775e90cdd7a0bac98df709b131deaa3"
+    }
+  },
+  "readonly_references": {
+    "m7_4a_result": {
+      "path": "benchmark-results/vlm-context/20260730-042019-350385-0400/result.json",
+      "size_bytes": 7546,
+      "sha256": "cf7e7084e7f042a3084dd99b3e1de42e78934ea6f70480920464ca0bcba8f90e"
+    },
+    "m7_4a_config": {
+      "path": "configs/vlm-context-smoke-m7.4.json",
+      "size_bytes": 3073,
+      "sha256": "403fad86914872558ea47a4c0cde2f4777f4f28d1904505b80c83bdac5c8e3a7"
+    },
+    "m7_4a_runner": {
+      "path": "scripts/run_vlm_context_smoke.py",
+      "size_bytes": 29233,
+      "sha256": "0eece1acfca5309539e662d5e1289c688e1c72125bc7612fe5eac738c3f57a5c"
+    },
+    "m7_4a_evaluation": {
+      "path": "docs/evaluation/vlm-qwen25-3b-context-8192-m7.4a.json",
+      "size_bytes": 5905,
+      "sha256": "fac040ddf3b55fb29cc9edd5d0162cc1526f49e502e830aa99a30413e9f4a61a"
+    }
+  },
+  "fixture": {
+    "generator": "scripts/generate_vlm_long_context_fixture.py",
+    "synthetic_only": true,
+    "contains_real_customer_information": false,
+    "filler_blocks_min": 90,
+    "filler_blocks_max": 94,
+    "calibrated_filler_blocks_hint": 92,
+    "raw_token_target_min": 6200,
+    "raw_token_target_max": 6400,
+    "direct_prompt_token_min": 6000,
+    "direct_prompt_token_max": 7000,
+    "facts": {
+      "start_code": "A17",
+      "middle_torque_nm": 42,
+      "reset_seconds": 7
+    },
+    "expected_publisher_substring": "The New York Times",
+    "calibration_basis": {
+      "reference_prompt_raw_tokens": 14,
+      "reference_cli_prompt_tokens": 415,
+      "reference_image_tokens": 391,
+      "chat_and_marker_overhead_tokens": 10,
+      "expected_cli_minus_raw_tokens": 401,
+      "evidence": "benchmark-results/vlm-context/20260730-042019-350385-0400/result.json"
+    }
+  },
+  "fixed_parameters": {
+    "context": 8192,
+    "batch": 512,
+    "ubatch": 512,
+    "gpu_layers": 99,
+    "flash_attention": "on",
+    "temperature": 0,
+    "seed": 424242,
+    "max_new_tokens": 128,
+    "mmproj_offload": true,
+    "offline": true,
+    "warmup": false,
+    "chat_mode": false,
+    "prompt_source": "--file"
+  },
+  "launcher": {
+    "default_execute": false,
+    "execute_requires_flag": "--execute",
+    "timeout_seconds": 900,
+    "timeout_kill_after_seconds": 30,
+    "wall_clock_command": "date +%s%N",
+    "forbidden_dependency": "/usr/bin/time",
+    "telemetry_command": "tegrastats",
+    "telemetry_interval_ms": 250,
+    "retry_count": 0,
+    "output_root": "benchmark-results/vlm-long-context"
+  },
+  "policy": {
+    "automatic_download": false,
+    "hf_arguments_allowed": false,
+    "runtime_source_changes_allowed": false,
+    "contexts_executed": [8192],
+    "rag_enabled": false,
+    "agent_enabled": false,
+    "multi_session_enabled": false,
+    "performance_percentage_comparison_allowed": false,
+    "single_run_stability_or_deployment_claim_allowed": false
+  }
+}

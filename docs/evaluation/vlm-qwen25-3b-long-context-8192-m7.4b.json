@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "milestone": "M7.4B",
+  "status": "SUCCESS",
+  "success_gate_passed": true,
+  "result_directory": "benchmark-results/vlm-long-context/20260730-044757-968503-0400",
+  "tokenizer": {
+    "path": "third_party/llama.cpp-omni/build-jetson-release/bin/llama-tokenize",
+    "size_bytes": 29040,
+    "sha256": "1012999431de6d4f778759f7e6464e7f9578b3a8fe2f620dbf8af3aa563b2b03",
+    "built_target": "llama-tokenize",
+    "exit_code": 0,
+    "raw_token_count": 6334,
+    "raw_token_measurement_status": "DIRECTLY_EMITTED_BY_LLAMA_TOKENIZE",
+    "run_count": 1,
+    "counts_as_inference_attempt": false
+  },
+  "fixture": {
+    "path": "benchmark-results/vlm-long-context/20260730-044757-968503-0400/fixture.txt",
+    "generator": "scripts/generate_vlm_long_context_fixture.py",
+    "filler_blocks": 92,
+    "size_bytes": 34994,
+    "sha256": "69f658cbce2ade01e8bc20d73b4a801910ae3368d20e7d8acdafb9588df1fc90",
+    "synthetic_only": true,
+    "contains_real_customer_information": false,
+    "publisher_disclosed_in_text": false,
+    "fact_marker_counts": {
+      "start_code": 1,
+      "middle_torque_nm": 1,
+      "reset_seconds": 1
+    },
+    "fact_position_ratios": {
+      "start_code": 0.01074469909127279,
+      "middle_torque_nm": 0.4985997599588501,
+      "reset_seconds": 0.9870835000285764
+    }
+  },
+  "fixed_run": {
+    "context": 8192,
+    "batch": 512,
+    "ubatch": 512,
+    "gpu_layers_requested": 99,
+    "flash_attention_requested": "on",
+    "temperature": 0,
+    "seed": 424242,
+    "max_new_tokens": 128,
+    "prompt_source": "--file",
+    "offline": true,
+    "warmup": false,
+    "chat_mode": false
+  },
+  "assets": {
+    "inference_binary": {
+      "path": "third_party/llama.cpp-omni/build-jetson-release/bin/llama-mtmd-cli",
+      "size_bytes": 67520,
+      "sha256": "454227ac3ea4b07631e3da62cec1157f8e75442e1d3fe8c02aece2d1759168d0",
+      "verification_status": "VERIFIED"
+    },
+    "main_model": {
+      "path": "models/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf",
+      "size_bytes": 1929901056,
+      "sha256": "d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12",
+      "verification_status": "VERIFIED"
+    },
+    "mmproj": {
+      "path": "models/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf",
+      "size_bytes": 844757728,
+      "sha256": "980c9b2f78c04e6cff93d277ada09e768394f112d75db3b4e9dea8a69f9fb904",
+      "verification_status": "VERIFIED"
+    },
+    "image": {
+      "path": "third_party/llama.cpp-omni/tools/mtmd/test-1.jpeg",
+      "size_bytes": 124071,
+      "sha256": "2dff664c0c8aaea18aff8cbe7e868845b775e90cdd7a0bac98df709b131deaa3",
+      "verification_status": "VERIFIED"
+    }
+  },
+  "git": {
+    "project": {
+      "commit": "2d72b69bbafd0ff27e88d0de3c7bbfe6a6d5d5e3",
+      "dirty": true
+    },
+    "runtime": {
+      "commit": "19cc26967140407efe34006a355ab445b35b16ac",
+      "dirty": false
+    }
+  },
+  "actual_runtime": {
+    "context": 8192,
+    "batch": 512,
+    "ubatch": 512,
+    "prompt_tokens": 6735,
+    "prompt_token_gate": "6000_TO_7000_PASSED",
+    "image_tokens": 391,
+    "image_tokens_measurement_status": "DIRECTLY_PARSED_FROM_CLI_LOG",
+    "output_tokens": 41,
+    "image_grid_x": 23,
+    "image_grid_y": 17,
+    "main_model_loaded": true,
+    "mmproj_loaded": true,
+    "offloaded_layers": "37/37",
+    "mmproj_tensor_count": 519,
+    "mmproj_cuda": true,
+    "cuda_path_logged": true,
+    "flash_attention": "enabled"
+  },
+  "kv_cache": {
+    "total_mib": 288.0,
+    "cells": 8192,
+    "layers": 36,
+    "k_type": "f16",
+    "k_mib": 144.0,
+    "v_type": "f16",
+    "v_mib": 144.0,
+    "measurement_status": "DIRECTLY_PARSED_FROM_CLI_LOG"
+  },
+  "vision": {
+    "image_decode_succeeded": true,
+    "vision_preprocess_succeeded": true,
+    "vision_encode_succeeded": true,
+    "embedding_injection_succeeded": true,
+    "image_positions": null,
+    "image_positions_measurement_status": "NOT_EMITTED_BY_CLI_NO_ESTIMATE"
+  },
+  "correctness": {
+    "passed": true,
+    "parse_error": null,
+    "valid_json": true,
+    "exact_keys": true,
+    "answers": {
+      "publisher": "The New York Times",
+      "start_code": "A17",
+      "middle_torque_nm": 42,
+      "reset_seconds": 7
+    },
+    "publisher_contains_expected": true,
+    "start_code_exact": true,
+    "middle_torque_nm_exact_integer": true,
+    "reset_seconds_exact_integer": true,
+    "raw_answer_artifact": "benchmark-results/vlm-long-context/20260730-044757-968503-0400/stdout.log"
+  },
+  "timings_ms": {
+    "model_load": 31304.48,
+    "vision_preprocess": null,
+    "vision_preprocess_measurement_status": "NOT_EMITTED_BY_CLI_NO_ESTIMATE",
+    "vision_encode": 2782.0,
+    "image_embedding_decode": 32.0,
+    "prompt_eval": 29223.41,
+    "decode": 5695.88,
+    "cli_total": 37033.86,
+    "wall_clock": 38499,
+    "wall_clock_measurement": "date +%s%N"
+  },
+  "telemetry": {
+    "sample_count": 151,
+    "peak_uma_used_mb": 10789,
+    "uma_total_mb": 30697,
+    "peak_gr3d_percent": 99,
+    "peak_temperature_c": 57.125,
+    "power_rails_mw": {
+      "VDD_CPU_CV": 2677,
+      "VDD_GPU_SOC": 7268,
+      "VIN_SYS_5V0": 6562
+    },
+    "measurement_status": "DIRECTLY_PARSED_FROM_TEGRASTATS"
+  },
+  "process": {
+    "exit_code": 0,
+    "timed_out": false,
+    "llama_mtmd_cli_invoked": true,
+    "inference_run_count": 1,
+    "retry_count": 0
+  },
+  "finish_reason": "eog",
+  "failure_class": null,
+  "output_nonempty": true,
+  "success_criteria": {
+    "prompt_tokens_6000_to_7000": true,
+    "image_tokens_directly_reported": true,
+    "model_mmproj_cuda_and_vision_succeeded": true,
+    "output_json_parse_succeeded": true,
+    "all_four_answers_correct": true,
+    "no_oom_cuda_error_context_overflow_or_crash": true,
+    "telemetry_sample_present": true
+  },
+  "scope": {
+    "single_synthetic_long_manual_test": true,
+    "rag": false,
+    "actual_multi_turn_session": false,
+    "production_manual_quality_evaluation": false,
+    "average_performance_or_stability_conclusion": false,
+    "m7_4a_performance_percentage_comparison": false,
+    "contexts_16384_or_32768_executed": false
+  }
+}

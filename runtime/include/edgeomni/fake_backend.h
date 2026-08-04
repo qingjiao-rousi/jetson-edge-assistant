@@ -16,6 +16,8 @@ class FakeBackend final : public RuntimeBackend {
 
     // Test-only deterministic pacing; production DirectBackend has no such hook.
     void set_test_delay_ms(uint32_t delay_ms);
+    unsigned int generate_call_count() const;
+    GenerateRequest last_request() const;
 
   private:
     mutable std::mutex mutex_;
@@ -24,6 +26,8 @@ class FakeBackend final : public RuntimeBackend {
     std::string active_request_id_;
     std::shared_ptr<std::atomic_bool> active_cancel_flag_;
     uint32_t test_delay_ms_ = 0;
+    unsigned int generate_call_count_ = 0;
+    GenerateRequest last_request_;
 };
 
 }  // namespace edgeomni

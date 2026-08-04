@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "milestone": "M7.3R",
+  "status": "SUCCESS",
+  "result_directory": "benchmark-results/vlm-smoke/20260730-035616-0400",
+  "parent_launcher_failure": {
+    "directory": "benchmark-results/vlm-smoke/20260730-033701-0400",
+    "reason": "/usr/bin/time was missing",
+    "llama_mtmd_cli_invoked": false,
+    "inference_run_count": 0
+  },
+  "first_real_inference_attempt": {
+    "exit_code": 0,
+    "inference_run_count": 1,
+    "retry_count": 0,
+    "context": 4096,
+    "batch": 512,
+    "ubatch": 512,
+    "gpu_layers_requested": 99,
+    "flash_attention_actual": "enabled",
+    "main_model_loaded": true,
+    "mmproj_loaded": true,
+    "image_decoded": true,
+    "vision_encoded": true,
+    "embedding_injected": true,
+    "cuda_path_logged": true,
+    "output_nonempty": true,
+    "image_tokens": 391,
+    "image_positions": null,
+    "image_positions_measurement_status": "NOT_EMITTED_BY_CLI_NO_ESTIMATE",
+    "timings_ms": {
+      "vision_preprocess": null,
+      "vision_encode": 1597,
+      "image_embedding_decode": 59,
+      "prompt_eval": 2574.04,
+      "decode": 4613.04,
+      "cli_total": 8242.29,
+      "wall_clock": 11477
+    },
+    "tegrastats_peaks": {
+      "uma_used_mb": 10425,
+      "gpu_load_percent": 99,
+      "temperature_c": 56.343,
+      "vin_sys_5v0_mw": 6663
+    },
+    "output_summary": "Identified The New York Times, the July 21, 1969 front page, and the Moon landing headline."
+  },
+  "scope": "Single smoke fact only; no average performance, stability, or deployment conclusion."
+}

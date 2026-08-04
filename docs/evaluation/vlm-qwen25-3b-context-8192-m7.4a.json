@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "milestone": "M7.4A",
+  "status": "SUCCESS",
+  "success_gate_passed": true,
+  "result_directory": "benchmark-results/vlm-context/20260730-042019-350385-0400",
+  "command_artifact": "benchmark-results/vlm-context/20260730-042019-350385-0400/command.txt",
+  "fixed_run": {
+    "context": 8192,
+    "batch": 512,
+    "ubatch": 512,
+    "gpu_layers_requested": 99,
+    "flash_attention_requested": "on",
+    "temperature": 0,
+    "seed": 424242,
+    "max_new_tokens": 128,
+    "warmup": false,
+    "offline": true,
+    "chat_mode": false,
+    "prompt": "Describe the image and identify the newspaper publisher. Answer in concise English."
+  },
+  "assets": {
+    "binary": {
+      "path": "third_party/llama.cpp-omni/build-jetson-release/bin/llama-mtmd-cli",
+      "size_bytes": 67520,
+      "sha256": "454227ac3ea4b07631e3da62cec1157f8e75442e1d3fe8c02aece2d1759168d0",
+      "verification_status": "VERIFIED"
+    },
+    "main_model": {
+      "path": "models/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf",
+      "size_bytes": 1929901056,
+      "sha256": "d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12",
+      "verification_status": "VERIFIED"
+    },
+    "mmproj": {
+      "path": "models/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf",
+      "size_bytes": 844757728,
+      "sha256": "980c9b2f78c04e6cff93d277ada09e768394f112d75db3b4e9dea8a69f9fb904",
+      "verification_status": "VERIFIED"
+    },
+    "image": {
+      "path": "third_party/llama.cpp-omni/tools/mtmd/test-1.jpeg",
+      "size_bytes": 124071,
+      "sha256": "2dff664c0c8aaea18aff8cbe7e868845b775e90cdd7a0bac98df709b131deaa3",
+      "verification_status": "VERIFIED"
+    }
+  },
+  "git": {
+    "project": {
+      "commit": "2d72b69bbafd0ff27e88d0de3c7bbfe6a6d5d5e3",
+      "dirty": true
+    },
+    "runtime": {
+      "commit": "19cc26967140407efe34006a355ab445b35b16ac",
+      "dirty": false
+    }
+  },
+  "actual_runtime": {
+    "context": 8192,
+    "batch": 512,
+    "ubatch": 512,
+    "main_model_loaded": true,
+    "mmproj_loaded": true,
+    "offloaded_layers": "37/37",
+    "mmproj_tensor_count": 519,
+    "mmproj_cuda": true,
+    "cuda_path_logged": true,
+    "flash_attention": "enabled"
+  },
+  "kv_cache": {
+    "total_mib": 288.0,
+    "cells": 8192,
+    "layers": 36,
+    "k_type": "f16",
+    "k_mib": 144.0,
+    "v_type": "f16",
+    "v_mib": 144.0,
+    "measurement_status": "DIRECTLY_PARSED_FROM_CLI_LOG"
+  },
+  "vision": {
+    "image_decode_succeeded": true,
+    "vision_preprocess_succeeded": true,
+    "vision_encode_succeeded": true,
+    "embedding_injection_succeeded": true,
+    "image_grid_x": 23,
+    "image_grid_y": 17,
+    "image_tokens": 391,
+    "image_tokens_measurement_status": "DIRECTLY_PARSED_FROM_CLI_LOG",
+    "image_positions": null,
+    "image_positions_measurement_status": "NOT_EMITTED_BY_CLI_NO_ESTIMATE"
+  },
+  "tokens": {
+    "prompt_tokens": 415,
+    "output_tokens": 67,
+    "output_tokens_measurement_status": "LLAMA_PERF_EVAL_RUN_COUNT"
+  },
+  "timings_ms": {
+    "vision_preprocess": null,
+    "vision_preprocess_measurement_status": "NOT_EMITTED_BY_CLI_NO_ESTIMATE",
+    "vision_encode": 2846.0,
+    "image_embedding_decode": 42.0,
+    "prompt_eval": 4709.92,
+    "decode": 8911.74,
+    "cli_total": 15696.67,
+    "wall_clock": 17245,
+    "wall_clock_measurement": "date +%s%N"
+  },
+  "telemetry": {
+    "sample_count": 68,
+    "peak_uma_used_mb": 10562,
+    "uma_total_mb": 30697,
+    "peak_gr3d_percent": 99,
+    "peak_temperature_c": 56.968,
+    "power_rails_mw": {
+      "VDD_CPU_CV": 3445,
+      "VDD_GPU_SOC": 6888,
+      "VIN_SYS_5V0": 6562
+    },
+    "measurement_status": "DIRECTLY_PARSED_FROM_TEGRASTATS"
+  },
+  "process": {
+    "exit_code": 0,
+    "timed_out": false,
+    "llama_mtmd_cli_invoked": true,
+    "inference_run_count": 1,
+    "retry_count": 0
+  },
+  "finish_reason": "eog",
+  "finish_reason_measurement_status": "CLI_DID_NOT_EMIT_EXPLICIT_REASON; SUCCESS_BELOW_MAX_WITHOUT_TIMEOUT",
+  "failure_class": null,
+  "output": {
+    "nonempty": true,
+    "size_bytes": 219,
+    "sha256": "47106aaf393c6cb5eaecd3c24d607547e14a4490c8609fc4a8bd443112d4104d",
+    "summary": "The model identified the July 21, 1969 The New York Times Moon-landing front page and named The New York Times as the publisher."
+  },
+  "success_criteria": {
+    "main_model_loaded": true,
+    "mmproj_loaded": true,
+    "cuda_offload_37_of_37": true,
+    "image_decoded": true,
+    "vision_encoded": true,
+    "embedding_injected": true,
+    "cuda_path_logged": true,
+    "output_nonempty": true,
+    "telemetry_sample_present": true,
+    "no_oom_cuda_error_context_overflow_or_crash": true
+  },
+  "context_matrix": [
+    {
+      "context": 4096,
+      "status": "EXISTING_SINGLE_SMOKE_REFERENCE",
+      "evidence": "benchmark-results/vlm-smoke/20260730-035616-0400"
+    },
+    {
+      "context": 8192,
+      "status": "M7.4A_SINGLE_SMOKE_SUCCESS",
+      "evidence": "benchmark-results/vlm-context/20260730-042019-350385-0400"
+    },
+    {
+      "context": 16384,
+      "status": "NOT_EXECUTED_IN_M7.4A"
+    },
+    {
+      "context": 32768,
+      "status": "NOT_EXECUTED_IN_M7.4A_RISK_VALIDATION_NOT_A_DEPLOYMENT_COMMITMENT"
+    }
+  ],
+  "reference_4096": {
+    "scope": "ONE_EXISTING_SINGLE_IMAGE_SMOKE",
+    "kv_total_mib": 144.0,
+    "image_grid": "23x17",
+    "image_tokens": 391,
+    "vision_encode_ms": 1597,
+    "image_embedding_decode_ms": 59,
+    "prompt_eval_ms": 2574.04,
+    "decode_ms": 4613.04,
+    "cli_total_ms": 8242.29,
+    "wall_clock_ms": 11477,
+    "peak_uma_used_mb": 10425,
+    "peak_gr3d_percent": 99,
+    "peak_temperature_c": 56.343
+  },
+  "scope": {
+    "statement": "4096 and 8192 are separate single-image smoke facts only; no average performance, stability, or deployment conclusion.",
+    "performance_percentage_comparison": false,
+    "long_manual_or_multi_turn_validated": false,
+    "metadata_context_128000_used_as_deployment_evidence": false
+  }
+}

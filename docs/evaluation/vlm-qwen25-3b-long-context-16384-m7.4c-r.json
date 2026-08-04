@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "milestone": "M7.4C-R",
+  "status": "SUCCESS",
+  "evidence_directory": "benchmark-results/vlm-long-context-16384-recovery/20260730-061237-155284-0400",
+  "attempt_ordinal": 2,
+  "previous_inference_attempt_count": 1,
+  "retry_count": 1,
+  "child_exit_code": 0,
+  "cuda_preflight": "CUDA0: Orin (30697 MiB, 19862 MiB free)",
+  "actual_runtime": {"context": 16384, "batch": 512, "ubatch": 512, "offloaded_layers": "37/37", "mmproj_cuda": true, "prompt_tokens": 13702, "output_tokens": 41, "image_tokens": 391, "image_grid": [23, 17]},
+  "kv_cache": {"total_mib": 576.0, "cells": 16384, "layers": 36, "k_type": "f16", "v_type": "f16", "k_mib": 288.0, "v_mib": 288.0},
+  "vision": {"image_decode_succeeded": true, "vision_encode_succeeded": true, "embedding_injection_succeeded": true, "image_positions": null},
+  "correctness": {"passed": true, "publisher": "The New York Times", "start_code": "A17", "middle_torque_nm": 42, "reset_seconds": 7},
+  "timings_ms": {"vision_encode": 2888.0, "image_embedding_decode": 43.0, "prompt_eval": 57512.7, "decode": 5607.47, "cli_total": 65340.91, "wall_clock": null},
+  "telemetry": {"sample_count": 260, "peak_uma_used_mb": 12105, "uma_total_mb": 30697, "peak_gr3d_percent": 99, "peak_temperature_c": 58.218, "power_rails_mw": {"VDD_CPU_CV": 2680, "VDD_GPU_SOC": 7268, "VIN_SYS_5V0": 6764}},
+  "process_groups": {"model_returncode": 0, "model_term_sent": false, "telemetry_returncode": -15, "telemetry_term_sent": true, "telemetry_kill_sent": false, "tegrastats_stopped": true},
+  "scope": {"single_recovery_smoke": true, "default_context_changed": false, "performance_or_stability_conclusion": false, "deployment_conclusion": false, "rag": false, "agent": false, "multi_session": false, "context_32768_executed": false}
+}

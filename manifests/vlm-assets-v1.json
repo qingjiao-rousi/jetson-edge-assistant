@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "audit_id": "vlm-assets-v1",
+  "milestone": "M7.2b",
+  "scope": "Qwen2.5-VL local asset verification and candidate freeze",
+  "audit_date": "2026-07-30",
+  "source_root": "models/",
+  "restrictions_observed": {
+    "model_downloaded": false,
+    "inference_run": false,
+    "llama_mtmd_cli_built": false,
+    "runtime_source_modified": false,
+    "m6_benchmark_results_modified": false
+  },
+  "deployment_architecture": {
+    "mode": "single_resident_vlm",
+    "text_requests": "resident_vlm_language_backbone",
+    "image_requests": "resident_vlm_vision_encoder_mmproj_language_backbone",
+    "qwen3_llm": "separate_text_baseline_or_explicit_text_fallback_only",
+    "qwen3_is_vlm_secondary_candidate": false,
+    "qwen3_default_resident": false,
+    "vlm_secondary_is_automatic_runtime_fallback": false
+  },
+  "context_policy": {
+    "remote_model_metadata_declaration": {
+      "model": "Qwen2.5-VL-3B-Instruct",
+      "context_length": 128000,
+      "local_gguf_key": "qwen2vl.context_length",
+      "local_gguf_value": 128000,
+      "status": "DECLARATION_ONLY_NOT_A_DEPLOYMENT_COMMITMENT"
+    },
+    "rule": "Do not infer Jetson deployable context or performance from repository metadata, GGUF metadata, or parameter count.",
+    "effective_context_budget": "image_tokens + image_text_tokens + manual_text_tokens + history_tokens + output_reservation <= n_ctx",
+    "measurement_matrix": {
+      "4096": {
+        "purpose": "smoke",
+        "status": "PENDING_MEASUREMENT"
+      },
+      "8192": {
+        "purpose": "default candidate",
+        "status": "PENDING_MEASUREMENT"
+      },
+      "16384": {
+        "purpose": "long manuals and multi-turn image-text",
+        "status": "PENDING_MEASUREMENT"
+      },
+      "32768": {
+        "purpose": "risk validation",
+        "status": "NOT_A_DEPLOYMENT_COMMITMENT"
+      }
+    }
+  },
+  "candidate_selection": [
+    {
+      "rank": 1,
+      "id": "qwen25_vl_3b_q4_k_m",
+      "name": "Qwen2.5-VL-3B-Instruct Q4_K_M",
+      "model_repo": "ggml-org/Qwen2.5-VL-3B-Instruct-GGUF",
+      "revision": "5037fcf163dd95d1e41d1974465f0898ed108ca2",
+      "license": "Apache-2.0",
+      "status": "LOCAL_ASSETS_VERIFIED",
+      "main_model_asset_id": "qwen25_vl_3b_main_q4_k_m",
+      "mmproj_asset_id": "qwen25_vl_3b_mmproj_q8_0",
+      "binding_id": "qwen25_vl_3b_main_mmproj_binding",
+      "runtime_measurement_status": "NOT_RUN"
+    },
+    {
+      "rank": 2,
+      "id": "qwen25_vl_7b_q4_k_m",
+      "name": "Qwen2.5-VL-7B-Instruct Q4_K_M",
+      "model_repo": "ggml-org/Qwen2.5-VL-7B-Instruct-GGUF",
+      "revision": "508edd0afaa66bb9e9f40587acc2184f02daf1f6",
+      "license": null,
+      "license_status": "PENDING_REMOTE_API_AUDIT",
+      "status": "REMOTE_AUDIT_ONLY",
+      "target_quantization": "Q4_K_M",
+      "remote_file_inventory_status": "NETWORK_CONNECT_TIMEOUT",
+      "remote_sha256": null,
+      "local_sha256": null,
+      "remote_size_bytes": null,
+      "local_size_bytes": null,
+      "local_status": "NOT_DOWNLOADED_BY_POLICY",
+      "verification_status": "REMOTE_FILE_METADATA_NOT_VERIFIED",
+      "is_automatic_runtime_fallback": false,
+      "support_evidence": "third_party/llama.cpp-omni/tools/mtmd/tests.sh:104-113"
+    },
+    {
+      "rank": 3,
+      "id": "internvl3_8b_q4_k_m",
+      "name": "InternVL3-8B-Instruct Q4_K_M",
+      "model_repo": "ggml-org/InternVL3-8B-Instruct-GGUF",
+      "revision": null,
+      "license": null,
+      "status": "THIRD_AUDIT_CANDIDATE_UNPINNED",
+      "target_quantization": "Q4_K_M",
+      "local_status": "NOT_REQUESTED",
+      "verification_status": "NOT_AUDITED_IN_M7_2B",
+      "support_evidence": "third_party/llama.cpp-omni/tools/mtmd/tests.sh:104-113"
+    }
+  ],
+  "assets": [
+    {
+      "id": "qwen25_vl_3b_main_q4_k_m",
+      "role": "vlm_main_model",
+      "model_repo": "ggml-org/Qwen2.5-VL-3B-Instruct-GGUF",
+      "revision": "5037fcf163dd95d1e41d1974465f0898ed108ca2",
+      "license": "Apache-2.0",
+      "path": "models/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf",
+      "filename": "Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf",
+      "quantization": "Q4_K_M",
+      "remote_sha256": "d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12",
+      "local_sha256": "d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12",
+      "remote_size_bytes": 1929901056,
+      "local_size_bytes": 1929901056,
+      "local_status": "PRESENT",
+      "verification_status": "SIZE_AND_SHA256_VERIFIED",
+      "gguf_metadata": {
+        "GGUF.version": 3,
+        "GGUF.tensor_count": 434,
+        "general.architecture": "qwen2vl",
+        "general.type": "model",
+        "general.name": "Qwen2.5 VL 3B Instruct",
+        "general.basename": "Qwen2.5-VL",
+        "general.file_type": 15,
+        "general.file_type_name": "Q4_K_M",
+        "general.quantization_version": 2,
+        "qwen2vl.context_length": 128000,
+        "qwen2vl.embedding_length": 2048,
+        "qwen2vl.block_count": 36,
+        "qwen2vl.attention.head_count": 16,
+        "qwen2vl.attention.head_count_kv": 2,
+        "tokenizer.ggml.model": "gpt2",
+        "tokenizer.ggml.pre": "qwen2",
+        "tokenizer.chat_template.present": true,
+        "tokenizer.chat_template.utf8_bytes": 1017,
+        "tokenizer.chat_template.sha256": "a0bc6f6fc7a29a80017a433e8f03a1cc1236e838a944a2d034295a60c4f2fddb"
+      }
+    },
+    {
+      "id": "qwen25_vl_3b_mmproj_q8_0",
+      "role": "mmproj",
+      "model_repo": "ggml-org/Qwen2.5-VL-3B-Instruct-GGUF",
+      "revision": "5037fcf163dd95d1e41d1974465f0898ed108ca2",
+      "license": "Apache-2.0",
+      "path": "models/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf",
+      "filename": "mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf",
+      "quantization": "Q8_0",
+      "remote_sha256": "980c9b2f78c04e6cff93d277ada09e768394f112d75db3b4e9dea8a69f9fb904",
+      "local_sha256": "980c9b2f78c04e6cff93d277ada09e768394f112d75db3b4e9dea8a69f9fb904",
+      "remote_size_bytes": 844757728,
+      "local_size_bytes": 844757728,
+      "local_status": "PRESENT",
+      "verification_status": "SIZE_AND_SHA256_VERIFIED",
+      "gguf_metadata": {
+        "GGUF.version": 3,
+        "GGUF.tensor_count": 519,
+        "general.architecture": "clip",
+        "general.type": "clip-vision",
+        "general.name": "Qwen2.5 VL 3B Instruct",
+        "general.basename": "Qwen2.5-VL",
+        "general.file_type": 7,
+        "general.file_type_name": "Q8_0",
+        "general.quantization_version": 2,
+        "clip.projector_type": "qwen2.5vl_merger",
+        "clip.has_vision_encoder": true,
+        "clip.vision.projection_dim": 2048,
+        "clip.vision.embedding_length": 1280,
+        "clip.vision.image_size": 560,
+        "clip.vision.patch_size": 14,
+        "clip.vision.feed_forward_length": 3420,
+        "clip.vision.block_count": 32,
+        "clip.vision.attention.head_count": 16,
+        "clip.use_silu": true,
+        "clip.vision.n_wa_pattern": 8
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "id": "qwen25_vl_3b_main_mmproj_binding",
+      "main_model_asset_id": "qwen25_vl_3b_main_q4_k_m",
+      "mmproj_asset_id": "qwen25_vl_3b_mmproj_q8_0",
+      "revision": "5037fcf163dd95d1e41d1974465f0898ed108ca2",
+      "verification_status": "METADATA_BINDING_VERIFIED_NOT_RUNTIME_TESTED",
+      "metadata_evidence": {
+        "general.name_match": true,
+        "general.basename_match": true,
+        "main_general.architecture": "qwen2vl",
+        "mmproj_general.architecture": "clip",
+        "mmproj_clip.projector_type": "qwen2.5vl_merger",
+        "main_qwen2vl.embedding_length": 2048,
+        "mmproj_clip.vision.projection_dim": 2048,
+        "projection_dimension_match": true
+      }
+    }
+  ],
+  "metadata_extraction": {
+    "tool": "third_party/llama.cpp-omni/gguf-py",
+    "command": "PYTHONPATH=third_party/llama.cpp-omni/gguf-py python3 -m gguf.scripts.gguf_dump --json --no-tensors <file>",
+    "status": "SUCCEEDED_FOR_BOTH_LOCAL_ASSETS"
+  },
+  "remote_audit": {
+    "candidate_id": "qwen25_vl_7b_q4_k_m",
+    "download_attempted": false,
+    "api_metadata_query_attempted": true,
+    "api_metadata_query_status": "NETWORK_CONNECT_TIMEOUT",
+    "local_cache_found": false,
+    "unverified_fields_left_null": true
+  },
+  "overall_verification_status": "PRIMARY_LOCAL_ASSETS_VERIFIED_CANDIDATES_FROZEN"
+}

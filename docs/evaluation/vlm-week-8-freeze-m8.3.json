@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "milestone": "M8.3",
+  "status": "WEEK_8_FROZEN",
+  "date": "2026-08-04",
+  "default_context": 8192,
+  "experimental_contexts": [16384],
+  "disabled_contexts": [32768],
+  "runtime_commit": "19cc26967140407efe34006a355ab445b35b16ac",
+  "application_api": "POST /v1/diagnose/image",
+  "facts": {
+    "m7_5c_r": "one persistent service, three sequential fixed-image requests",
+    "m8_2_initial": "application request rejected before backend; inference_run_count corrected to 0",
+    "m8_2_r": "one repaired application request, one backend inference, HTTP 200 and SSE order passed"
+  },
+  "week_8_model_execution_after_m8_2_r": false,
+  "claims_excluded": ["average_performance", "stability", "concurrency", "production_deployment", "metadata_128000_deployability"],
+  "next_stage": "Week 9 single-VLM RAG offline contract and fixed-corpus validation"
+}
