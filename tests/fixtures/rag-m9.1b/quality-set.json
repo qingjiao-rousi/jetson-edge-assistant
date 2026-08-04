@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1B",
+  "scope": "synthetic-contract-quality-set",
+  "questions": [
+    {"id": "route-bx-cavitation", "query": "Why does the BX-9 pump make a gravel-like sound?", "expected_document_id": "BX9-MANUAL-001", "expected_chunk_id": "BX9-MANUAL-001#cavitation-warning", "answerable": true, "category": "multi-document-routing"},
+    {"id": "rewrite-bx-cavitation", "query": "What condition causes vapor bubbles and unstable pump pressure?", "expected_document_id": "BX9-MANUAL-001", "expected_chunk_id": "BX9-MANUAL-001#cavitation-warning", "answerable": true, "category": "synonym-rewrite"},
+    {"id": "exact-ax-e42", "query": "What does alarm E42 mean on AX-17?", "expected_document_id": "AX17-MANUAL-001", "expected_chunk_id": "AX17-MANUAL-001#alarm-e42", "answerable": true, "category": "exact-fault-code"},
+    {"id": "distractor-bx-e42", "query": "What does E42 mean on the BX-9 motor?", "expected_document_id": "BX9-MANUAL-001", "expected_chunk_id": "BX9-MANUAL-001#alarm-e42", "answerable": true, "category": "similar-device-distractor"},
+    {"id": "route-ct-t17", "query": "输送带跑偏代码 T17 是什么意思？", "expected_document_id": "CT4-MANUAL-001", "expected_chunk_id": "CT4-MANUAL-001#chinese-operator-note", "answerable": true, "category": "chinese-boundary"},
+    {"id": "english-ct-reset", "query": "How long should the CT-4 blue reset key be pressed?", "expected_document_id": "CT4-MANUAL-001", "expected_chunk_id": "CT4-MANUAL-001#emergency-stop-reset", "answerable": true, "category": "english-boundary"},
+    {"id": "no-oil-grade", "query": "What hydraulic oil grade is approved for AX-17?", "expected_document_id": null, "expected_chunk_id": null, "answerable": false, "category": "explicit-no-answer"},
+    {"id": "no-bearing-life", "query": "What is the bearing replacement life of the CT-4?", "expected_document_id": null, "expected_chunk_id": null, "answerable": false, "category": "explicit-no-answer"}
+  ]
+}

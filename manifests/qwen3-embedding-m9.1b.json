@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1B",
+  "asset_id": "qwen3-embedding-0.6b-q8_0",
+  "model_id": "Qwen/Qwen3-Embedding-0.6B",
+  "repository": "Qwen/Qwen3-Embedding-0.6B-GGUF",
+  "revision": "d20cf9c16f82914a21dbd9c645f56895fb1d7750",
+  "license": "apache-2.0",
+  "filename": "Qwen3-Embedding-0.6B-Q8_0.gguf",
+  "path": "models/embedding/Qwen3-Embedding-0.6B-Q8_0.gguf",
+  "size_bytes": 639150592,
+  "sha256": "06507c7b42688469c4e7298b0a1e16deff06caf291cf0a5b278c308249c3e439",
+  "xet_hash": "c07418bff31dfab7ab0754eaa7a376c0cbb0cba7dada80fe4c5adb4d24d44291",
+  "gguf": {
+    "version": 3,
+    "architecture": "qwen3",
+    "parameter_count": 595776512,
+    "context_length": 32768,
+    "embedding_dimension": 1024,
+    "quantization": "Q8_0",
+    "pooling": "last",
+    "pooling_metadata_value": 3
+  },
+  "runtime": {
+    "provider": "llama-cpp-gguf",
+    "normalization": "l2",
+    "dtype": "float32",
+    "network_required": false
+  },
+  "verified_at": "2026-08-04",
+  "distribution": "GGUF is locally installed and git-ignored; this manifest does not distribute model bytes."
+}

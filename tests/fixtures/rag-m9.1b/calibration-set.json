@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1B",
+  "split": "threshold-calibration",
+  "questions": [
+    {"id":"cal-ax-pressure","query":"What pressure should the AX-17 compressor normally produce?","expected_chunk_id":"AX17-MANUAL-001#technical-specifications","answerable":true,"category":"multi-document-routing"},
+    {"id":"cal-ax-cooling","query":"Which AX-17 alarm indicates insufficient coolant circulation?","expected_chunk_id":"AX17-MANUAL-001#alarm-e42","answerable":true,"category":"synonym-rewrite"},
+    {"id":"cal-bx-cavitation","query":"The BX-9 rattles like gravel and its pressure fluctuates. What condition should be checked?","expected_chunk_id":"BX9-MANUAL-001#cavitation-warning","answerable":true,"category":"synonym-rewrite"},
+    {"id":"cal-bx-e42","query":"What does alarm E42 mean on the BX-9?","expected_chunk_id":"BX9-MANUAL-001#alarm-e42","answerable":true,"category":"similar-device-distractor"},
+    {"id":"cal-ct-t17-zh","query":"CT-4 的输送带跑偏代码是什么含义？","expected_chunk_id":"CT4-MANUAL-001#chinese-operator-note","answerable":true,"category":"chinese-boundary"},
+    {"id":"cal-ct-reset","query":"How is the CT-4 emergency stop reset?","expected_chunk_id":"CT4-MANUAL-001#emergency-stop-reset","answerable":true,"category":"multi-document-routing"},
+    {"id":"cal-bx-maintenance","query":"When should the BX-9 inlet strainer be inspected?","expected_chunk_id":"BX9-MANUAL-001#maintenance-schedule","answerable":true,"category":"exact-fact"},
+    {"id":"cal-ax-reset","query":"How many seconds is the AX-17 reset control held?","expected_chunk_id":"AX17-MANUAL-001#reset-procedure","answerable":true,"category":"exact-fact"},
+    {"id":"cal-no-oil","query":"Which hydraulic oil grade is approved for the AX-17?","expected_chunk_id":null,"answerable":false,"category":"explicit-no-answer"},
+    {"id":"cal-no-bearing","query":"What is the specified bearing service life for the BX-9?","expected_chunk_id":null,"answerable":false,"category":"explicit-no-answer"},
+    {"id":"cal-no-bx-reset","query":"For how many seconds must the BX-9 reset button be held?","expected_chunk_id":null,"answerable":false,"category":"similar-device-distractor"},
+    {"id":"cal-no-ct-e42","query":"What does alarm E42 mean on the CT-4 conveyor?","expected_chunk_id":null,"answerable":false,"category":"similar-device-distractor"}
+  ]
+}

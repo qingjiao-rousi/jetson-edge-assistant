@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1B",
+  "split": "final-evaluation",
+  "questions": [
+    {"id":"eval-ax-torque","query":"What is the rated shaft torque of AX-17?","expected_chunk_id":"AX17-MANUAL-001#technical-specifications","answerable":true,"category":"exact-fact"},
+    {"id":"eval-ax-inspection","query":"How frequently is scheduled AX-17 inspection required?","expected_chunk_id":"AX17-MANUAL-001#maintenance-schedule","answerable":true,"category":"synonym-rewrite"},
+    {"id":"eval-ax-e42-distractor","query":"On AX-17, is E42 a cooling-flow or motor-temperature fault?","expected_chunk_id":"AX17-MANUAL-001#alarm-e42","answerable":true,"category":"similar-device-distractor"},
+    {"id":"eval-bx-pressure","query":"What is the BX-9 nominal outlet pressure?","expected_chunk_id":"BX9-MANUAL-001#technical-specifications","answerable":true,"category":"exact-fact"},
+    {"id":"eval-bx-temperature","query":"What fluid temperature range is permitted for BX-9?","expected_chunk_id":"BX9-MANUAL-001#technical-specifications","answerable":true,"category":"multi-document-routing"},
+    {"id":"eval-bx-bubbles","query":"What should be inspected when vapor formation disrupts BX-9 suction flow?","expected_chunk_id":"BX9-MANUAL-001#cavitation-warning","answerable":true,"category":"synonym-rewrite"},
+    {"id":"eval-ct-t17-en","query":"What does tracking warning T17 indicate on CT-4?","expected_chunk_id":"CT4-MANUAL-001#belt-tracking","answerable":true,"category":"english-boundary"},
+    {"id":"eval-ct-maintenance","query":"When are CT-4 belt tension and alignment inspected?","expected_chunk_id":"CT4-MANUAL-001#maintenance-schedule","answerable":true,"category":"exact-fact"},
+    {"id":"eval-no-ax-viscosity","query":"What lubricant viscosity is required by AX-17?","expected_chunk_id":null,"answerable":false,"category":"explicit-no-answer"},
+    {"id":"eval-no-bx-reset","query":"What is the BX-9 emergency-stop reset sequence?","expected_chunk_id":null,"answerable":false,"category":"similar-device-distractor"},
+    {"id":"eval-no-ct-e42-zh","query":"CT-4 的 E42 故障码表示什么？","expected_chunk_id":null,"answerable":false,"category":"chinese-boundary"},
+    {"id":"eval-no-ct-bearing-zh","query":"CT-4 轴承规定多少小时更换？","expected_chunk_id":null,"answerable":false,"category":"explicit-no-answer"}
+  ]
+}
