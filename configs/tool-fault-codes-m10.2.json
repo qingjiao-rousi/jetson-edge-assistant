@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "milestone": "M10.2-PROTOTYPE",
+  "fault_codes": [
+    {
+      "device_id": "AX-17",
+      "code": "E42",
+      "meaning": "Cooling loop flow is below the required threshold.",
+      "source": "knowledge/manuals/ax17-equipment-manual.md",
+      "chunk_id": "AX17-MANUAL-001#alarm-e42"
+    },
+    {
+      "device_id": "BX-9",
+      "code": "E42",
+      "meaning": "Motor winding temperature exceeded the safe limit.",
+      "source": "knowledge/manuals/bx9-hydraulic-pump-manual.md",
+      "chunk_id": "BX9-MANUAL-001#alarm-e42"
+    },
+    {
+      "device_id": "CT-4",
+      "code": "T17",
+      "meaning": "The belt moved beyond the alignment sensor limit.",
+      "source": "knowledge/manuals/ct4-conveyor-manual.md",
+      "chunk_id": "CT4-MANUAL-001#belt-tracking"
+    }
+  ]
+}
