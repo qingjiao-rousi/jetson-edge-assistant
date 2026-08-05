@@ -1,0 +1,626 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1B-R2.4",
+  "phase": "DIAGNOSTIC_DEV",
+  "status": "DONE",
+  "algorithm": "concept-lexical-evidence-v1",
+  "algorithm_fingerprint": "31aae901b2b39fb53b2b0cf5cfbbfda2fa95550abda6ebc4f1edc914dbe50c86",
+  "retrieval": {
+    "kind": "hybrid-rrf",
+    "top_k": 3,
+    "rrf_k": 60,
+    "admission": {
+      "minimum_vector_score": 0.4,
+      "minimum_keyword_coverage": 0.1,
+      "minimum_margin": 0.0001
+    },
+    "fact_evidence": {
+      "minimum_coverage": 0.25,
+      "minimum_terms": 1
+    },
+    "concept_lexical": {
+      "minimum_coverage": 0.25
+    }
+  },
+  "quality_gate": {
+    "mode": "hybrid",
+    "minimum_recall_at_1": 0.75,
+    "minimum_recall_at_3": 0.875,
+    "minimum_mrr": 0.8,
+    "minimum_no_answer_correct_rejection_rate": 0.75,
+    "maximum_false_positive_count": 1
+  },
+  "quality_gate_result": {
+    "passed": true,
+    "checks": {
+      "recall_at_1": true,
+      "recall_at_3": true,
+      "mrr": true,
+      "no_answer_correct_rejection_rate": true,
+      "false_positive_count": true
+    }
+  },
+  "quality_metrics": {
+    "sample_count": 12,
+    "answerable_count": 8,
+    "no_answer_count": 4,
+    "recall_at_1": 0.875,
+    "recall_at_3": 1.0,
+    "mrr": 0.9375,
+    "no_answer_correct_rejection_rate": 1.0,
+    "false_positive_count": 0,
+    "questions": [
+      {
+        "id": "d24-service",
+        "expected_chunk_id": "AX17-MANUAL-001#maintenance-schedule",
+        "returned_chunk_ids": [
+          "AX17-MANUAL-001#maintenance-schedule",
+          "AX17-MANUAL-001#reset-procedure",
+          "AX17-MANUAL-001#technical-specifications"
+        ],
+        "rank": 1,
+        "answerable": true,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.74461111,
+          "keyword_coverage": 0.33333333,
+          "margin": 0.01665785,
+          "fact_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "maintenance"
+            ],
+            "matched_families": [
+              {
+                "family": "maintenance",
+                "heading_matches": [
+                  "schedule"
+                ],
+                "content_matches": [
+                  "schedule",
+                  "inspection",
+                  "inspect",
+                  "operating hours"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          },
+          "concept_lexical_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "maintenance"
+            ],
+            "matched_families": [
+              {
+                "family": "maintenance",
+                "heading_matches": [
+                  "schedule"
+                ],
+                "content_matches": [
+                  "schedule",
+                  "inspection",
+                  "inspect",
+                  "operating hours"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          }
+        }
+      },
+      {
+        "id": "d24-zh-maint",
+        "expected_chunk_id": "CT4-MANUAL-001#maintenance-schedule",
+        "returned_chunk_ids": [
+          "CT4-MANUAL-001#chinese-operator-note",
+          "CT4-MANUAL-001#maintenance-schedule",
+          "CT4-MANUAL-001#belt-tracking"
+        ],
+        "rank": 2,
+        "answerable": true,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.58689771,
+          "keyword_coverage": 0.16666667,
+          "margin": 0.01587302,
+          "fact_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "maintenance",
+              "tracking"
+            ],
+            "matched_families": [
+              {
+                "family": "maintenance",
+                "heading_matches": [],
+                "content_matches": [
+                  "检查",
+                  "对中"
+                ]
+              },
+              {
+                "family": "tracking",
+                "heading_matches": [],
+                "content_matches": [
+                  "跑偏",
+                  "输送带",
+                  "对中",
+                  "滚筒"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          },
+          "concept_lexical_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "maintenance",
+              "tracking"
+            ],
+            "matched_families": [
+              {
+                "family": "maintenance",
+                "heading_matches": [],
+                "content_matches": [
+                  "检查",
+                  "对中"
+                ]
+              },
+              {
+                "family": "tracking",
+                "heading_matches": [],
+                "content_matches": [
+                  "跑偏",
+                  "输送带",
+                  "对中",
+                  "滚筒"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          }
+        }
+      },
+      {
+        "id": "d24-temp",
+        "expected_chunk_id": "BX9-MANUAL-001#technical-specifications",
+        "returned_chunk_ids": [
+          "BX9-MANUAL-001#technical-specifications",
+          "BX9-MANUAL-001#alarm-e42",
+          "BX9-MANUAL-001#maintenance-schedule"
+        ],
+        "rank": 1,
+        "answerable": true,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.70769575,
+          "keyword_coverage": 1.0,
+          "margin": 0.00052882,
+          "fact_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "temperature"
+            ],
+            "matched_families": [
+              {
+                "family": "temperature",
+                "heading_matches": [],
+                "content_matches": [
+                  "temperature",
+                  "fluid"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          },
+          "concept_lexical_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "temperature"
+            ],
+            "matched_families": [
+              {
+                "family": "temperature",
+                "heading_matches": [],
+                "content_matches": [
+                  "temperature",
+                  "fluid"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          }
+        }
+      },
+      {
+        "id": "d24-track",
+        "expected_chunk_id": "CT4-MANUAL-001#chinese-operator-note",
+        "returned_chunk_ids": [
+          "CT4-MANUAL-001#chinese-operator-note",
+          "CT4-MANUAL-001#belt-tracking",
+          "CT4-MANUAL-001#maintenance-schedule"
+        ],
+        "rank": 1,
+        "answerable": true,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.79420784,
+          "keyword_coverage": 0.55555556,
+          "margin": 0.01665785,
+          "fact_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "tracking"
+            ],
+            "matched_families": [
+              {
+                "family": "tracking",
+                "heading_matches": [],
+                "content_matches": [
+                  "跑偏",
+                  "输送带",
+                  "对中",
+                  "滚筒"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          },
+          "concept_lexical_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "tracking"
+            ],
+            "matched_families": [
+              {
+                "family": "tracking",
+                "heading_matches": [],
+                "content_matches": [
+                  "跑偏",
+                  "输送带",
+                  "对中",
+                  "滚筒"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          }
+        }
+      },
+      {
+        "id": "d24-reset",
+        "expected_chunk_id": "CT4-MANUAL-001#emergency-stop-reset",
+        "returned_chunk_ids": [
+          "CT4-MANUAL-001#emergency-stop-reset",
+          "CT4-MANUAL-001#maintenance-schedule",
+          "CT4-MANUAL-001#belt-tracking"
+        ],
+        "rank": 1,
+        "answerable": true,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.76512789,
+          "keyword_coverage": 0.6,
+          "margin": 0.01665785,
+          "fact_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "reset"
+            ],
+            "matched_families": [
+              {
+                "family": "reset",
+                "heading_matches": [
+                  "reset",
+                  "emergency stop"
+                ],
+                "content_matches": [
+                  "reset"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          },
+          "concept_lexical_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "reset"
+            ],
+            "matched_families": [
+              {
+                "family": "reset",
+                "heading_matches": [
+                  "reset",
+                  "emergency stop"
+                ],
+                "content_matches": [
+                  "reset"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          }
+        }
+      },
+      {
+        "id": "d24-cav",
+        "expected_chunk_id": "BX9-MANUAL-001#cavitation-warning",
+        "returned_chunk_ids": [
+          "BX9-MANUAL-001#cavitation-warning",
+          "BX9-MANUAL-001#maintenance-schedule",
+          "BX9-MANUAL-001#alarm-e42"
+        ],
+        "rank": 1,
+        "answerable": true,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.75882639,
+          "keyword_coverage": 1.0,
+          "margin": 0.01665785,
+          "fact_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "cavitation"
+            ],
+            "matched_families": [
+              {
+                "family": "cavitation",
+                "heading_matches": [
+                  "cavitation"
+                ],
+                "content_matches": [
+                  "cavitation",
+                  "suction",
+                  "rattling"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          },
+          "concept_lexical_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "cavitation"
+            ],
+            "matched_families": [
+              {
+                "family": "cavitation",
+                "heading_matches": [
+                  "cavitation"
+                ],
+                "content_matches": [
+                  "cavitation",
+                  "suction",
+                  "rattling"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          }
+        }
+      },
+      {
+        "id": "d24-pressure",
+        "expected_chunk_id": "AX17-MANUAL-001#technical-specifications",
+        "returned_chunk_ids": [
+          "AX17-MANUAL-001#technical-specifications",
+          "AX17-MANUAL-001#maintenance-schedule",
+          "AX17-MANUAL-001#reset-procedure"
+        ],
+        "rank": 1,
+        "answerable": true,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.72385846,
+          "keyword_coverage": 0.33333333,
+          "margin": 0.01665785,
+          "fact_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "pressure"
+            ],
+            "matched_families": [
+              {
+                "family": "pressure",
+                "heading_matches": [],
+                "content_matches": [
+                  "pressure",
+                  "kpa"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          },
+          "concept_lexical_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "pressure"
+            ],
+            "matched_families": [
+              {
+                "family": "pressure",
+                "heading_matches": [],
+                "content_matches": [
+                  "pressure",
+                  "kpa"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          }
+        }
+      },
+      {
+        "id": "d24-torque",
+        "expected_chunk_id": "AX17-MANUAL-001#technical-specifications",
+        "returned_chunk_ids": [
+          "AX17-MANUAL-001#technical-specifications",
+          "AX17-MANUAL-001#maintenance-schedule",
+          "AX17-MANUAL-001#reset-procedure"
+        ],
+        "rank": 1,
+        "answerable": true,
+        "admission": {
+          "passed": true,
+          "reasons": [],
+          "vector_score": 0.76392323,
+          "keyword_coverage": 0.66666667,
+          "margin": 0.01665785,
+          "fact_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "torque"
+            ],
+            "matched_families": [
+              {
+                "family": "torque",
+                "heading_matches": [],
+                "content_matches": [
+                  "torque",
+                  "shaft"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          },
+          "concept_lexical_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "torque"
+            ],
+            "matched_families": [
+              {
+                "family": "torque",
+                "heading_matches": [],
+                "content_matches": [
+                  "torque",
+                  "shaft"
+                ]
+              }
+            ],
+            "coverage": 1.0
+          }
+        }
+      },
+      {
+        "id": "d24-no-oil",
+        "expected_chunk_id": null,
+        "returned_chunk_ids": [],
+        "rank": null,
+        "answerable": false,
+        "admission": {
+          "passed": false,
+          "reasons": [
+            "missing_fact_family_evidence",
+            "missing_concept_lexical_evidence"
+          ],
+          "vector_score": 0.46570758,
+          "keyword_coverage": 0.33333333,
+          "margin": 0.015625,
+          "fact_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "oil"
+            ],
+            "matched_families": [],
+            "coverage": 0.0
+          },
+          "concept_lexical_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "oil"
+            ],
+            "matched_families": [],
+            "coverage": 0.0
+          }
+        }
+      },
+      {
+        "id": "d24-no-generic",
+        "expected_chunk_id": null,
+        "returned_chunk_ids": [],
+        "rank": null,
+        "answerable": false,
+        "admission": {
+          "passed": false,
+          "reasons": [
+            "missing_fact_family_evidence",
+            "missing_concept_lexical_evidence",
+            "top1_top2_margin_below_threshold"
+          ],
+          "vector_score": 0.77558414,
+          "keyword_coverage": 0.5,
+          "margin": 0.0,
+          "fact_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [],
+            "matched_families": [],
+            "coverage": 0.0
+          },
+          "concept_lexical_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [],
+            "matched_families": [],
+            "coverage": 0.0
+          }
+        }
+      },
+      {
+        "id": "d24-no-code",
+        "expected_chunk_id": null,
+        "returned_chunk_ids": [],
+        "rank": null,
+        "answerable": false,
+        "admission": {
+          "passed": false,
+          "reasons": [
+            "no_candidate_satisfies_hard_constraints",
+            "missing_concept_lexical_evidence"
+          ]
+        }
+      },
+      {
+        "id": "d24-no-relation",
+        "expected_chunk_id": null,
+        "returned_chunk_ids": [],
+        "rank": null,
+        "answerable": false,
+        "admission": {
+          "passed": false,
+          "reasons": [
+            "missing_fact_family_evidence",
+            "missing_concept_lexical_evidence"
+          ],
+          "vector_score": 0.56156619,
+          "keyword_coverage": 0.0,
+          "margin": 0.00026441,
+          "fact_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "tracking"
+            ],
+            "matched_families": [],
+            "coverage": 0.0
+          },
+          "concept_lexical_evidence": {
+            "lexicon_version": "industrial-concepts-v2",
+            "requested_families": [
+              "tracking"
+            ],
+            "matched_families": [],
+            "coverage": 0.0
+          }
+        }
+      }
+    ]
+  },
+  "holdout_execution": "PROHIBITED"
+}
