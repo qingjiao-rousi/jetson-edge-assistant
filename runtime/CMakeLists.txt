@@ -92,6 +92,12 @@ if(EDGEOMNI_BUILD_TESTS)
     target_compile_features(edgeomni_mtmd_backend_unit_test PRIVATE cxx_std_17)
     target_link_libraries(edgeomni_mtmd_backend_unit_test PRIVATE edgeomni_runtime)
     add_test(NAME edgeomni_mtmd_backend_unit_test COMMAND edgeomni_mtmd_backend_unit_test)
+    if(EDGEOMNI_BUILD_BENCHMARK_TOOLS)
+        add_test(NAME edgeomni_qwen3_benchmark_runner_cli_test
+            COMMAND $<TARGET_FILE:edgeomni_qwen3_benchmark_runner> --help)
+        set_tests_properties(edgeomni_qwen3_benchmark_runner_cli_test PROPERTIES
+            PASS_REGULAR_EXPRESSION "--session-id.*--prompt-2")
+    endif()
 endif()
 
 if(EDGEOMNI_BUILD_INTEGRATION)

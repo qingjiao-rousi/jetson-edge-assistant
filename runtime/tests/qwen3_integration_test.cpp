@@ -37,6 +37,49 @@ int main() {
         backend.shutdown();
         return EXIT_FAILURE;
     }
+    auto generate_with_first_token = [&](edgeomni::GenerateRequest value, std::string * first_token) {
+        return backend.generate_text(value, [&](const edgeomni::StreamToken & token) {
+            if (first_token->empty()) *first_token = token.text;
+            return true;
+        });
+    };
+    request.session_id = "qwen3-kv-prefix";
+    request.request_id = "qwen3-kv-cold";
+    std::string cold_first_token;
+    const auto cold = generate_with_first_token(request, &cold_first_token);
+    request.request_id = "qwen3-kv-hot";
+    std::string hot_first_token;
+    const auto hot = generate_with_first_token(request, &hot_first_token);
+    if (cold.code != edgeomni::RuntimeErrorCode::kOk || hot.code != edgeomni::RuntimeErrorCode::kOk ||
+        hot.metrics.cache_hit_tokens == 0U || cold_first_token != hot_first_token || cold.text != hot.text) {
+        std::cerr << "KV cold/hot output equivalence failed\n";
+        backend.shutdown();
+        return EXIT_FAILURE;
+    }
+    request.request_id = "qwen3-kv-branch";
+    request.messages = {{"user", "Reply with one word: stable"}};
+    const auto branch = backend.generate_text(request);
+    if (branch.code != edgeomni::RuntimeErrorCode::kOk || branch.metrics.cache_hit_tokens == 0U ||
+        branch.metrics.cache_hit_tokens >= branch.prompt_tokens) {
+        std::cerr << "KV prefix branch contract failed\n";
+        backend.shutdown();
+        return EXIT_FAILURE;
+    }
+    if (!backend.reset_context().ok()) {
+        std::cerr << "KV reset failed\n";
+        backend.shutdown();
+        return EXIT_FAILURE;
+    }
+    request.request_id = "qwen3-kv-after-reset";
+    const auto after_reset = backend.generate_text(request);
+    if (after_reset.code != edgeomni::RuntimeErrorCode::kOk || after_reset.metrics.cache_hit_tokens != 0U ||
+        after_reset.text != branch.text) {
+        std::cerr << "KV reset output equivalence failed\n";
+        backend.shutdown();
+        return EXIT_FAILURE;
+    }
+    request.session_id.clear();
+    request.messages = {{"user", "Reply with one word: ready"}};
     request.request_id = "qwen3-cancel";
     const auto cancelled = backend.generate_text(request, [](const edgeomni::StreamToken &) { return false; });
     if (cancelled.finish_reason != "cancelled") {

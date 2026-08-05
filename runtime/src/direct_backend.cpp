@@ -79,6 +79,18 @@ Status token_to_piece(const llama_vocab * vocab, llama_token token, std::string 
     }
 }
 
+std::string runtime_config_fingerprint(const RuntimeConfig & config) {
+    return config.model_path + "\n" + config.expected_model_sha256 + "\n" +
+           std::to_string(config.expected_model_size_bytes) + "\n" + config.mmproj_path + "\n" +
+           config.expected_mmproj_sha256 + "\n" + std::to_string(config.expected_mmproj_size_bytes) + "\n" +
+           std::to_string(config.context_tokens) + "\n" + std::to_string(config.batch_tokens) + "\n" +
+           std::to_string(config.ubatch_tokens) + "\n" + std::to_string(config.gpu_layers) + "\n" +
+           std::to_string(config.generation_threads) + "\n" + std::to_string(config.batch_threads) + "\n" +
+           std::to_string(config.use_mmap) + "\n" + std::to_string(config.flash_attention) + "\n" +
+           std::to_string(config.max_image_bytes) + "\n" + std::to_string(config.max_image_width) + "\n" +
+           std::to_string(config.max_image_height) + "\n" + std::to_string(config.max_image_pixels);
+}
+
 }  // namespace
 
 class DirectBackend::Impl {
@@ -94,6 +106,11 @@ class DirectBackend::Impl {
     RequestControl request_control;
     std::mutex request_mutex;
     std::string active_request_id;
+    std::string hot_session_id;
+    std::vector<llama_token> hot_prompt_tokens;
+    std::string hot_model_hash;
+    std::string hot_template_fingerprint;
+    std::string hot_runtime_config_fingerprint;
 };
 
 DirectBackend::DirectBackend() : impl_(std::make_unique<Impl>()) {}
@@ -170,8 +187,15 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
     const auto started = std::chrono::steady_clock::now();
     GenerateResponse response;
     response.request_id = request.request_id;
+    response.session_id = request.session_id;
     response.metrics.model_ready_ms = impl_->model_ready_ms;
     if (!request.images.empty()) {
+        if (impl_->initialized) {
+            llama_synchronize(impl_->context.get());
+            llama_memory_clear(llama_get_memory(impl_->context.get()), false);
+        }
+        impl_->hot_session_id.clear(); impl_->hot_prompt_tokens.clear();
+        response.metrics.cache_invalidation_reason = "image_request";
         response.code = RuntimeErrorCode::kInvalidArgument;
         response.error_message = "DirectBackend does not support images; use the VLM adapter backend";
         response.finish_reason = "error";
@@ -227,6 +251,10 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
     std::string prompt;
     const Status render_status = renderer.render(request.messages, true, &prompt);
     if (!render_status.ok()) {
+        llama_synchronize(impl_->context.get());
+        llama_memory_clear(llama_get_memory(impl_->context.get()), false);
+        impl_->hot_session_id.clear(); impl_->hot_prompt_tokens.clear();
+        response.metrics.cache_invalidation_reason = "prompt_render_failed";
         response.code = render_status.code;
         response.error_message = render_status.message;
         response.finish_reason = "error";
@@ -234,6 +262,10 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
     }
     const int32_t required = llama_tokenize(impl_->vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()), nullptr, 0, true, true);
     if (required >= 0) {
+        llama_synchronize(impl_->context.get());
+        llama_memory_clear(llama_get_memory(impl_->context.get()), false);
+        impl_->hot_session_id.clear(); impl_->hot_prompt_tokens.clear();
+        response.metrics.cache_invalidation_reason = "tokenize_failed";
         response.code = RuntimeErrorCode::kTokenizeFailed;
         response.error_message = "llama_tokenize did not return required token count";
         response.finish_reason = "error";
@@ -242,6 +274,10 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
     std::vector<llama_token> tokens(static_cast<size_t>(-required));
     if (llama_tokenize(impl_->vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()), tokens.data(),
                        static_cast<int32_t>(tokens.size()), true, true) < 0) {
+        llama_synchronize(impl_->context.get());
+        llama_memory_clear(llama_get_memory(impl_->context.get()), false);
+        impl_->hot_session_id.clear(); impl_->hot_prompt_tokens.clear();
+        response.metrics.cache_invalidation_reason = "tokenize_failed";
         response.code = RuntimeErrorCode::kTokenizeFailed;
         response.error_message = "llama_tokenize failed";
         response.finish_reason = "error";
@@ -249,17 +285,65 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
     }
     const uint32_t context_capacity = llama_n_ctx(impl_->context.get());
     if (tokens.size() + request.max_new_tokens > context_capacity) {
+        llama_synchronize(impl_->context.get());
+        llama_memory_clear(llama_get_memory(impl_->context.get()), false);
+        impl_->hot_session_id.clear(); impl_->hot_prompt_tokens.clear();
+        response.metrics.cache_invalidation_reason = "context_limit";
         response.code = RuntimeErrorCode::kContextLimit;
         response.error_message = "prompt plus requested generation exceeds context";
         response.finish_reason = "error";
         return response;
     }
-    llama_memory_clear(llama_get_memory(impl_->context.get()), false);
+    const auto clear_hot = [&](const char * reason) {
+        llama_synchronize(impl_->context.get());
+        llama_memory_clear(llama_get_memory(impl_->context.get()), false);
+        llama_synchronize(impl_->context.get());
+        impl_->hot_session_id.clear();
+        impl_->hot_prompt_tokens.clear();
+        impl_->hot_model_hash.clear();
+        impl_->hot_template_fingerprint.clear();
+        impl_->hot_runtime_config_fingerprint.clear();
+        response.metrics.cache_invalidation_reason = reason;
+    };
+    const auto remove_kv_range = [&](size_t begin) {
+        llama_synchronize(impl_->context.get());
+        const bool removed = llama_memory_seq_rm(llama_get_memory(impl_->context.get()), 0,
+                                                 static_cast<llama_pos>(begin), -1);
+        llama_synchronize(impl_->context.get());
+        return removed;
+    };
+    size_t reused = 0;
+    if (request.session_id.empty()) {
+        clear_hot("no_session_id");
+    } else if (!impl_->hot_session_id.empty() && impl_->hot_session_id != request.session_id) {
+        clear_hot("session_id_changed");
+    } else if (!impl_->hot_session_id.empty() &&
+               (impl_->hot_model_hash != impl_->config.expected_model_sha256 ||
+                impl_->hot_template_fingerprint != ChatTemplateRenderer::kQwen3TemplateSha256 ||
+                impl_->hot_runtime_config_fingerprint != runtime_config_fingerprint(impl_->config))) {
+        clear_hot("runtime_config_changed");
+    } else if (!impl_->hot_prompt_tokens.empty()) {
+        while (reused < impl_->hot_prompt_tokens.size() && reused < tokens.size() &&
+               impl_->hot_prompt_tokens[reused] == tokens[reused]) ++reused;
+        // Re-run one prompt token so llama logits always correspond to this request.
+        if (reused == tokens.size() && reused > 0U) --reused;
+        if (!remove_kv_range(reused)) {
+            clear_hot("kv_rollback_failed");
+            reused = 0;
+        }
+    } else {
+        llama_memory_clear(llama_get_memory(impl_->context.get()), false);
+    }
+    response.metrics.cache_hit_tokens = static_cast<uint32_t>(reused);
+    response.metrics.cache_miss_tokens = static_cast<uint32_t>(tokens.size() - reused);
+    response.metrics.prefill_input_tokens = response.metrics.cache_miss_tokens;
+    response.metrics.cache_hit_ratio = tokens.empty() ? 0.0 : static_cast<double>(reused) / tokens.size();
+    response.metrics.cache_reused = reused > 0U;
     const auto prefill_started = std::chrono::steady_clock::now();
 
     const int32_t batch_capacity = static_cast<int32_t>(std::min<uint32_t>(impl_->config.batch_tokens, context_capacity));
     BatchOwner batch_owner(batch_capacity);
-    for (size_t begin = 0; begin < tokens.size();) {
+    for (size_t begin = reused; begin < tokens.size();) {
         const int32_t count = static_cast<int32_t>(std::min<size_t>(batch_capacity, tokens.size() - begin));
         auto & batch = batch_owner.batch;
         batch.n_tokens = count;
@@ -272,7 +356,7 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
         }
         const int32_t decode_result = llama_decode(impl_->context.get(), batch);
         if (decode_result != 0) {
-            recover();
+            clear_hot("prefill_failed");
             if (cancelled()) {
                 response.code = RuntimeErrorCode::kCancelled;
                 response.finish_reason = "cancelled";
@@ -304,6 +388,7 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
         response.code = RuntimeErrorCode::kInternal;
         response.error_message = "llama_sampler_chain_init returned null";
         response.finish_reason = "error";
+        clear_hot("sampler_init_failed");
         response.metrics.total_ms = elapsed_ms();
         return response;
     }
@@ -316,14 +401,14 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
     const auto decode_started = std::chrono::steady_clock::now();
     for (uint32_t generated = 0; generated < request.max_new_tokens; ++generated) {
         if (cancelled()) {
-            recover();
+            clear_hot("cancelled");
             response.code = RuntimeErrorCode::kCancelled;
             response.finish_reason = "cancelled";
             response.error_message = "request cancelled";
             break;
         }
         if (timed_out()) {
-            recover();
+            clear_hot("timeout");
             response.code = RuntimeErrorCode::kTimeout;
             response.finish_reason = "timeout";
             response.error_message = "request timed out";
@@ -340,12 +425,12 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
             response.code = piece_status.code;
             response.error_message = piece_status.message;
             response.finish_reason = "error";
-            recover();
+            clear_hot("token_to_text_failed");
             return response;
         }
         if (on_token && !on_token({request.request_id, piece, response.generated_tokens})) {
             impl_->request_control.cancelled.store(true);
-            recover();
+            clear_hot("cancelled");
             response.code = RuntimeErrorCode::kCancelled;
             response.finish_reason = "cancelled";
             response.error_message = "token callback cancelled request";
@@ -353,7 +438,10 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
         }
         response.text += piece;
         ++response.generated_tokens;
-        if (response.generated_tokens == 1U) response.metrics.first_token_ms = elapsed_ms();
+        if (response.generated_tokens == 1U) {
+            response.metrics.first_token_ms = elapsed_ms();
+            response.metrics.ttft_ms = response.metrics.first_token_ms;
+        }
 
         auto & batch = batch_owner.batch;
         batch.n_tokens = 1;
@@ -364,7 +452,7 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
         batch.logits[0] = 1;
         const int32_t decode_result = llama_decode(impl_->context.get(), batch);
         if (decode_result != 0) {
-            recover();
+            clear_hot("decode_failed");
             if (cancelled()) {
                 response.code = RuntimeErrorCode::kCancelled;
                 response.finish_reason = "cancelled";
@@ -390,6 +478,20 @@ GenerateResponse DirectBackend::generate_text(const GenerateRequest & request, c
             static_cast<double>(response.metrics.decode_ms);
     }
     if (response.finish_reason.empty()) response.finish_reason = "length";
+    if (response.code == RuntimeErrorCode::kOk) {
+        // Decode adds generated tokens after the prompt. Keep only the complete prompt KV.
+        if (!remove_kv_range(tokens.size())) {
+            clear_hot("kv_rollback_failed");
+        } else if (!request.session_id.empty()) {
+            impl_->hot_session_id = request.session_id;
+            impl_->hot_prompt_tokens = tokens;
+            impl_->hot_model_hash = impl_->config.expected_model_sha256;
+            impl_->hot_template_fingerprint = ChatTemplateRenderer::kQwen3TemplateSha256;
+            impl_->hot_runtime_config_fingerprint = runtime_config_fingerprint(impl_->config);
+        }
+    } else {
+        clear_hot("incomplete_request");
+    }
     return response;
 }
 
@@ -405,7 +507,14 @@ Status DirectBackend::cancel_request(const std::string & request_id) {
 Status DirectBackend::reset_context() {
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (!impl_->initialized) return {RuntimeErrorCode::kInvalidState, "DirectBackend is not initialized"};
+    llama_synchronize(impl_->context.get());
     llama_memory_clear(llama_get_memory(impl_->context.get()), false);
+    llama_synchronize(impl_->context.get());
+    impl_->hot_session_id.clear();
+    impl_->hot_prompt_tokens.clear();
+    impl_->hot_model_hash.clear();
+    impl_->hot_template_fingerprint.clear();
+    impl_->hot_runtime_config_fingerprint.clear();
     return Status::Ok();
 }
 
@@ -415,6 +524,11 @@ Status DirectBackend::shutdown() {
     impl_->model.reset();
     impl_->vocab = nullptr;
     impl_->initialized = false;
+    impl_->hot_session_id.clear();
+    impl_->hot_prompt_tokens.clear();
+    impl_->hot_model_hash.clear();
+    impl_->hot_template_fingerprint.clear();
+    impl_->hot_runtime_config_fingerprint.clear();
     if (impl_->backend_acquired) {
         release_llama_backend();
         impl_->backend_acquired = false;

@@ -103,6 +103,8 @@ struct RuntimeConfig {
 
 struct GenerateRequest {
     std::string request_id;
+    // Optional non-empty key for the single hot text KV prefix.
+    std::string session_id;
     std::vector<ChatMessage> messages;
     std::vector<ImageInput> images;  // M7.5A contract: 0..1 only.
     uint32_t max_new_tokens = 128;
@@ -133,10 +135,17 @@ struct RuntimeMetrics {
     uint64_t ttft_ms = 0;
     uint64_t tpot_ms = 0;
     double decode_tokens_per_second = 0.0;
+    uint32_t prefill_input_tokens = 0;
+    uint32_t cache_hit_tokens = 0;
+    uint32_t cache_miss_tokens = 0;
+    double cache_hit_ratio = 0.0;
+    bool cache_reused = false;
+    std::string cache_invalidation_reason;
 };
 
 struct GenerateResponse {
     std::string request_id;
+    std::string session_id;
     std::string text;
     RuntimeErrorCode code = RuntimeErrorCode::kOk;
     std::string error_message;

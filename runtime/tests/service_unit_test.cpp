@@ -62,7 +62,11 @@ int main_test() {
     auto bad_field = request("bad-field"); bad_field["extra"] = true; auto bad = client.Post("/v1/generate", bad_field.dump(), "application/json"); expect(bad && bad->status == 400, "unknown field");
     auto images_field = request("images-field"); images_field["images"] = json::array(); auto images = client.Post("/v1/generate", images_field.dump(), "application/json"); expect(images && images->status == 200, "empty images preserves text route compatibility");
     auto bad_hash = request("bad-hash"); bad_hash["model_sha256"] = "bad"; auto hash = client.Post("/v1/generate", bad_hash.dump(), "application/json"); expect(hash && hash->status == 400, "hash mismatch");
-    auto bad_session = request("bad-session"); bad_session["session_id"] = "s"; auto session = client.Post("/v1/generate", bad_session.dump(), "application/json"); expect(session && session->status == 400, "session rejected");
+    auto hot_session = request("hot-session"); hot_session["session_id"] = "s"; auto session = client.Post("/v1/generate", hot_session.dump(), "application/json");
+    expect(session && session->status == 200 && json::parse(session->body)["session_id"] == "s", "non-empty session accepted and echoed");
+    auto hot_session_again = request("hot-session-again"); hot_session_again["session_id"] = "s"; auto session_again = client.Post("/v1/chat", hot_session_again.dump(), "application/json");
+    expect(session_again && session_again->status == 200 && json::parse(session_again->body)["metrics"]["cache_hit_tokens"] > 0,
+           "chat route reports a hot prefix hit");
 
     auto sse = client.Post("/v1/generate", request("sse", true).dump(), "application/json");
     expect(sse && sse->status == 200 && sse->body.find("event: token") != std::string::npos && sse->body.find("event: done") != std::string::npos, "SSE token and done");

@@ -45,7 +45,10 @@ json metrics_json(const RuntimeMetrics & m) {
             {"image_embedding_ms", m.image_embedding_ms},
             {"decode_ms", m.decode_ms}, {"total_ms", m.total_ms},
             {"first_token_ms", m.first_token_ms}, {"ttft_ms", m.ttft_ms}, {"tpot_ms", m.tpot_ms},
-            {"decode_tokens_per_second", m.decode_tokens_per_second}};
+            {"decode_tokens_per_second", m.decode_tokens_per_second},
+            {"prefill_input_tokens", m.prefill_input_tokens}, {"cache_hit_tokens", m.cache_hit_tokens},
+            {"cache_miss_tokens", m.cache_miss_tokens}, {"cache_hit_ratio", m.cache_hit_ratio},
+            {"cache_reused", m.cache_reused}, {"cache_invalidation_reason", m.cache_invalidation_reason}};
 }
 
 json measurement_status(const RuntimeMetrics & m) {
@@ -55,7 +58,7 @@ json measurement_status(const RuntimeMetrics & m) {
 }
 
 json response_json(const GenerateResponse & r, const std::string & hash) {
-    json out = {{"request_id", r.request_id}, {"session_id", nullptr}, {"model_sha256", hash},
+    json out = {{"request_id", r.request_id}, {"session_id", r.session_id.empty() ? json(nullptr) : json(r.session_id)}, {"model_sha256", hash},
                 {"text", r.text}, {"finish_reason", r.finish_reason},
                 {"prompt_tokens", r.prompt_tokens}, {"output_tokens", r.generated_tokens},
                 {"image_tokens", r.image_tokens},
@@ -97,11 +100,10 @@ bool parse_request(const json & body, GenerateRequest * request, bool * stream, 
     if (!body.contains("request_id") || !body["request_id"].is_string() || body["request_id"].get<std::string>().empty()) {
         *error = "request_id is required"; return false;
     }
-    if (body.contains("session_id") && !body["session_id"].is_null() && (!body["session_id"].is_string() || !body["session_id"].get<std::string>().empty())) {
-        *error = "non-empty session_id is unsupported"; return false;
-    }
+    if (body.contains("session_id") && !body["session_id"].is_null() && !body["session_id"].is_string()) { *error = "session_id must be a string"; return false; }
     if (!body.contains("messages") || !body["messages"].is_array() || body["messages"].empty()) { *error = "messages must be non-empty array"; return false; }
     request->request_id = body["request_id"].get<std::string>();
+    if (body.contains("session_id") && !body["session_id"].is_null()) request->session_id = body["session_id"].get<std::string>();
     for (const auto & message : body["messages"]) {
         if (!message.is_object() || !has_only(message, {"role", "content"}) || !message.contains("role") || !message.contains("content") || !message["role"].is_string() || !message["content"].is_string()) { *error = "invalid message"; return false; }
         const std::string role = message["role"].get<std::string>();
@@ -175,7 +177,7 @@ RuntimeService::RuntimeService(std::shared_ptr<RuntimeBackend> backend) : impl_(
         GenerateRequest request; bool stream = false; std::string error;
         if (!parse_request(body, &request, &stream, impl_->config.model_sha256, &error)) { res.status = 400; res.set_content(json({{"error", {{"code", "invalid_argument"}, {"message", error}}}}).dump(), "application/json"); return; }
         { std::lock_guard<std::mutex> l(impl_->mutex); if (!impl_->initialized || impl_->stopping) { res.status = 503; return; } if (impl_->seen.count(request.request_id)) { res.status = 409; return; } if (!impl_->active.empty()) { res.status = 429; return; } impl_->seen.insert(request.request_id); impl_->active = request.request_id; impl_->accepted.fetch_add(1); }
-        if (stream) { res.set_chunked_content_provider("text/event-stream", [this, request](size_t, httplib::DataSink & sink) mutable { bool disconnected = false; bool got_token = false; uint64_t first_write = 0; uint64_t last_write = 0; const auto accepted_at = std::chrono::steady_clock::now(); auto emit = [&](const char * event, const json & data) { if (disconnected) return false; const std::string payload = std::string("event: ") + event + "\ndata: " + data.dump() + "\n\n"; if (!sink.write(payload.data(), payload.size())) { disconnected = true; request.cancel_flag->store(true); return false; } return true; }; emit("metadata", json({{"request_id", request.request_id}, {"image_tokens", nullptr}, {"image_metrics", {{"image_preprocess_ms", nullptr}, {"vision_encode_ms", nullptr}, {"image_embedding_ms", nullptr}}}, {"measurement_status", "not_measured_before_backend"}})); GenerateResponse out = impl_->backend->generate_text(request, [&](const StreamToken & t) { const bool written = emit("token", json({{"request_id", t.request_id}, {"session_id", nullptr}, {"index", t.index}, {"text", t.text}})); if (written) { const uint64_t now = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - accepted_at).count()); if (!got_token) { first_write = now; got_token = true; } last_write = now; impl_->token_count.fetch_add(1); } return written; }); if (!disconnected) { const char * event = out.finish_reason == "cancelled" ? "cancelled" : out.finish_reason == "timeout" ? "timeout" : out.code == RuntimeErrorCode::kOk ? "done" : "error"; emit(event, response_json(out, impl_->config.model_sha256)); } { std::lock_guard<std::mutex> l(impl_->mutex); impl_->last_service_ttft_ms = got_token ? first_write : 0; impl_->last_service_tpot_ms = got_token && out.generated_tokens > 1 ? (last_write - first_write) / (out.generated_tokens - 1) : 0; } impl_->finish(out); sink.done(); return true; }); res.set_header("Cache-Control", "no-cache"); res.set_header("Connection", "keep-alive"); return; }
+        if (stream) { res.set_chunked_content_provider("text/event-stream", [this, request](size_t, httplib::DataSink & sink) mutable { bool disconnected = false; bool got_token = false; uint64_t first_write = 0; uint64_t last_write = 0; const auto accepted_at = std::chrono::steady_clock::now(); auto emit = [&](const char * event, const json & data) { if (disconnected) return false; const std::string payload = std::string("event: ") + event + "\ndata: " + data.dump() + "\n\n"; if (!sink.write(payload.data(), payload.size())) { disconnected = true; request.cancel_flag->store(true); return false; } return true; }; emit("metadata", json({{"request_id", request.request_id}, {"session_id", request.session_id.empty() ? json(nullptr) : json(request.session_id)}, {"image_tokens", nullptr}, {"image_metrics", {{"image_preprocess_ms", nullptr}, {"vision_encode_ms", nullptr}, {"image_embedding_ms", nullptr}}}, {"measurement_status", "not_measured_before_backend"}})); GenerateResponse out = impl_->backend->generate_text(request, [&](const StreamToken & t) { const bool written = emit("token", json({{"request_id", t.request_id}, {"session_id", request.session_id.empty() ? json(nullptr) : json(request.session_id)}, {"index", t.index}, {"text", t.text}})); if (written) { const uint64_t now = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - accepted_at).count()); if (!got_token) { first_write = now; got_token = true; } last_write = now; impl_->token_count.fetch_add(1); } return written; }); if (!disconnected) { const char * event = out.finish_reason == "cancelled" ? "cancelled" : out.finish_reason == "timeout" ? "timeout" : out.code == RuntimeErrorCode::kOk ? "done" : "error"; emit(event, response_json(out, impl_->config.model_sha256)); } { std::lock_guard<std::mutex> l(impl_->mutex); impl_->last_service_ttft_ms = got_token ? first_write : 0; impl_->last_service_tpot_ms = got_token && out.generated_tokens > 1 ? (last_write - first_write) / (out.generated_tokens - 1) : 0; } impl_->finish(out); sink.done(); return true; }); res.set_header("Cache-Control", "no-cache"); res.set_header("Connection", "keep-alive"); return; }
         GenerateResponse out = impl_->backend->generate_text(request); impl_->finish(out); res.status = out.code == RuntimeErrorCode::kOk ? 200 : http_code(out.code); res.set_content(response_json(out, impl_->config.model_sha256).dump(), "application/json");
     };
     s.Post("/v1/generate", [handler](const httplib::Request & req, httplib::Response & res) { handler(req, res, false); });

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mutex>
+#include <vector>
 
 #include "edgeomni/runtime.h"
 
@@ -28,6 +29,8 @@ class FakeBackend final : public RuntimeBackend {
     uint32_t test_delay_ms_ = 0;
     unsigned int generate_call_count_ = 0;
     GenerateRequest last_request_;
+    std::string hot_session_id_;
+    std::vector<uint8_t> hot_prompt_tokens_;
 };
 
 }  // namespace edgeomni

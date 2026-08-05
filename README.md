@@ -8,13 +8,14 @@ KV Cache 或 `mtmd`；自研范围主要是 Jetson 适配、Runtime/Service 封�
 
 ## 当前阶段
 
-状态日期：2026-08-04。
+状态日期：2026-08-05。
 
 项目已完成第 1～8 周的 Jetson 基线、文本 Runtime、量化评测、VLM 图片链路和
-应用单图 API，当前进入第 9 周 RAG 阶段。M9.1A 已完成单份合成 Markdown 手册
-的 SQLite FTS5 关键词检索 MVP；本地 embedding/向量检索、RAG 与 VLM 的回答
-生成闭环仍未完成。因此当前定位是“可集成的端侧 LLM/VLM Runtime 与 RAG
-检索原型”，还不是完整设备故障辅助系统，也不是生产部署版本。
+应用单图 API、M9.2 手册问答原型和 M10.1 单热文本 KV Prefix 复用。M9.1B 已完成多文档索引、经审计的
+Qwen3-Embedding-0.6B Q8_0、本地向量/FTS5 混合检索、设备/故障码约束、引用和
+一次性最终评测流程。最新 R2.5 的 calibration 与 diagnostic 均通过，但独立
+holdout 的无答案拒绝率为 `0.50`、误命中为 `1`，未通过冻结质量门，M9.1B 仍为
+`PARTIAL`，不得重跑或用该 holdout 调参。M9.2 已完成“本地手册检索 + citation + 本地模型带来源回答”的原型闭环。M10.1 已完成单热文本 session 的 Token 级 KV Prefix 复用并完成 Jetson 冷/热/分叉验证。当前阶段为项目交付归档/演示准备，定位仍是“可集成的端侧 LLM/VLM Runtime 与 RAG 检索原型”，不是生产版本、完整工业全双工音视频系统或多用户会话系统。
 
 | 模块 | 状态 | 已有证据 |
 | --- | --- | --- |
@@ -22,9 +23,10 @@ KV Cache 或 `mtmd`；自研范围主要是 Jetson 适配、Runtime/Service 封�
 | 文本 Runtime/Service | 已完成阶段验收 | DirectBackend、HTTP/JSON/SSE、timeout/cancel/reset、单元与真实模型集成记录 |
 | Q4/Q8 与 KV 基线 | 已完成 M6 冻结 | Q4/Q8 各 15 次有效测量；部署优先 Q4；KV 固定 F16/F16 |
 | VLM Runtime/应用 API | 已完成 M8 冻结 | 固定 VLM/mmproj、4096/8192 冒烟、16384 实验、单常驻三图及应用 API 单图闭环 |
-| RAG | 进行中 | M9.1A 单文档 Markdown + FTS5 关键词检索、稳定引用、无命中返回 |
-| KV 多轮/Prefix 复用 | 计划中 | M10.1 已有设计；当前仍逐请求清空 KV，无命中证据 |
-| 工具/Agent/多会话 | 未开始 | 仅有需求与验收设计；真正多 session 在 M10.1 后评估 |
+| RAG | M9.1B PARTIAL | R2.5 校准/诊断通过；最终 12 题 holdout R@1/3/MRR=0.875/0.875/0.875，但拒绝率=0.50、误命中=1，质量门失败 |
+| 手册问答原型 | M9.2 已实现 | 检索有证据才调用本地 `/v1/chat`；回答保留检索引用，无证据不生成 |
+| KV 多轮/Prefix 复用 | M10.1 已完成 | 单热文本 session、Token LCP、分叉回滚、异常失效；冷/热输出一致 |
+| 工具/Agent/多会话 | 未交付 | 不属于当前收口范围；没有多用户会话、LRU/TTL 或缓存池 |
 | Docker/systemd/长稳 | 未开始 | 仅有部署设计，无配置、镜像或恢复记录 |
 
 完整判断、证据边界、测试结果和下一步见 [项目状态总结](md/总结.md)。
@@ -37,8 +39,12 @@ KV Cache 或 `mtmd`；自研范围主要是 Jetson 适配、Runtime/Service 封�
 - [第 8 周周报](md/week/第08周周报-VLM应用API与阶段冻结.md)：最近一个已冻结阶段。
 - [第 7 周 VLM 报告](docs/evaluation/vlm-week-7-report.md)：VLM 资产、context、服务实测证据。
 - [M9.1A RAG 设计](docs/design/rag-markdown-m9.1a.md)：当前 RAG MVP 的明确能力边界。
+- [M9.1B 混合检索设计](docs/design/rag-hybrid-m9.1b.md)：多文档、向量/混合检索和资产门禁。
+- [M9.1B R2.5 最终评测](docs/evaluation/rag-hybrid-m9.1b-r2.5-holdout-public.md)：最新质量门结论与公开审计信息。
+- [项目方向复盘](docs/reviews/project-direction-20260805.md)：主线一致性、当前偏差风险与收口后的下一步。
 - [M10.1 KV Prefix 复用设计](docs/design/kv-prefix-reuse-m10.1.md)：单热文本会话的
   Token 级复用、失效策略、指标和验收门。
+- [M10.1 KV Prefix 实机评测](docs/evaluation/kv-prefix-reuse-m10.1.md)：固定 Qwen3 模型上的冷、热和分叉结果。
 - `docs/design/`：设计协议；`docs/evaluation/`：冻结评测结论；
   `benchmark-results/`：原始运行证据；`manifests/`：环境、模型和部署决策。
 
