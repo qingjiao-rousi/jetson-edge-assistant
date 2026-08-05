@@ -1,0 +1,10 @@
+{"questions":[
+{"id":"d22-maintenance-en","query":"When is AX-17 routine servicing due?","expected_chunk_id":"AX17-MANUAL-001#maintenance-schedule"},
+{"id":"d22-maintenance-zh","query":"CT-4 保养和检查应在多少运行小时进行？","expected_chunk_id":"CT4-MANUAL-001#maintenance-schedule"},
+{"id":"d22-tracking","query":"CT-4 输送带跑偏报警应检查什么？","expected_chunk_id":"CT4-MANUAL-001#chinese-operator-note"},
+{"id":"d22-temperature","query":"What fluid temperature range is permitted for BX-9?","expected_chunk_id":"BX9-MANUAL-001#technical-specifications"},
+{"id":"d22-no-viscosity","query":"What lubricant viscosity is required by AX-17?","expected_chunk_id":null},
+{"id":"d22-no-cross-fault","query":"What does E42 mean on CT-4?","expected_chunk_id":null},
+{"id":"d22-no-generic","query":"What hydraulic pump check is required for BX-9?","expected_chunk_id":null},
+{"id":"d22-no-relation","query":"Does BX-9 require belt alignment maintenance?","expected_chunk_id":null}
+]}
