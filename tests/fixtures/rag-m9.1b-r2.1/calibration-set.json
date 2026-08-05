@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1B-R2.1",
+  "split": "calibration-expanded-fact-evidence",
+  "questions": [
+    {"id":"cal21-ax-pressure","query":"What pressure should the AX-17 compressor normally produce?","expected_chunk_id":"AX17-MANUAL-001#technical-specifications"},
+    {"id":"cal21-ax-cooling","query":"Which AX-17 alarm indicates insufficient coolant circulation?","expected_chunk_id":"AX17-MANUAL-001#alarm-e42"},
+    {"id":"cal21-bx-cavitation","query":"The BX-9 rattles like gravel and its pressure fluctuates. What condition should be checked?","expected_chunk_id":"BX9-MANUAL-001#cavitation-warning"},
+    {"id":"cal21-bx-e42","query":"What does alarm E42 mean on the BX-9?","expected_chunk_id":"BX9-MANUAL-001#alarm-e42"},
+    {"id":"cal21-ct-t17","query":"CT-4 的输送带跑偏代码是什么含义？","expected_chunk_id":"CT4-MANUAL-001#chinese-operator-note"},
+    {"id":"cal21-ct-reset","query":"How is the CT-4 emergency stop reset?","expected_chunk_id":"CT4-MANUAL-001#emergency-stop-reset"},
+    {"id":"cal21-bx-maintenance","query":"When should the BX-9 inlet strainer be inspected?","expected_chunk_id":"BX9-MANUAL-001#maintenance-schedule"},
+    {"id":"cal21-ax-reset","query":"How many seconds is the AX-17 reset control held?","expected_chunk_id":"AX17-MANUAL-001#reset-procedure"},
+    {"id":"cal21-no-oil","query":"Which hydraulic oil grade is approved for the AX-17?","expected_chunk_id":null},
+    {"id":"cal21-no-bearing","query":"What is the specified bearing service life for the BX-9?","expected_chunk_id":null},
+    {"id":"cal21-no-bx-reset","query":"For how many seconds must the BX-9 reset button be held?","expected_chunk_id":null},
+    {"id":"cal21-no-ct-e42","query":"What does alarm E42 mean on the CT-4 conveyor?","expected_chunk_id":null},
+    {"id":"cal21-no-ax-viscosity","query":"What lubricant viscosity is required by AX-17?","expected_chunk_id":null},
+    {"id":"cal21-no-bx-emergency","query":"What BX-9 emergency-stop sequence is specified?","expected_chunk_id":null},
+    {"id":"cal21-no-ax-e42-motor","query":"Does AX-17 E42 report motor winding temperature?","expected_chunk_id":null},
+    {"id":"cal21-no-ct-belt-speed","query":"CT-4 输送带的额定速度是多少？","expected_chunk_id":null}
+  ]
+}

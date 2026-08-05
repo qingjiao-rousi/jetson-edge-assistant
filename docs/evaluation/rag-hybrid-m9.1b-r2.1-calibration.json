@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1B-R2.1",
+  "phase": "CALIBRATION",
+  "algorithm": "fact-evidence-v1",
+  "embedding_fingerprint": "d0540b3ebba59a403437b0866625bd5d8392484806b41716a95c528bab4547b9",
+  "dataset_path": "tests/fixtures/rag-m9.1b-r2.1/calibration-set.json",
+  "dataset_sha256": "d7ee5eefa5935565ddd8657327b5ab3b5d2d5fd8ae662bc5f23768e88325a835",
+  "question_ids": [
+    "cal21-ax-pressure",
+    "cal21-ax-cooling",
+    "cal21-bx-cavitation",
+    "cal21-bx-e42",
+    "cal21-ct-t17",
+    "cal21-ct-reset",
+    "cal21-bx-maintenance",
+    "cal21-ax-reset",
+    "cal21-no-oil",
+    "cal21-no-bearing",
+    "cal21-no-bx-reset",
+    "cal21-no-ct-e42",
+    "cal21-no-ax-viscosity",
+    "cal21-no-bx-emergency",
+    "cal21-no-ax-e42-motor",
+    "cal21-no-ct-belt-speed"
+  ],
+  "candidate_count": 81,
+  "quality_gate_frozen_for_diagnostic": {
+    "mode": "hybrid",
+    "minimum_recall_at_1": 0.75,
+    "minimum_recall_at_3": 0.875,
+    "minimum_mrr": 0.8,
+    "minimum_no_answer_correct_rejection_rate": 0.75,
+    "maximum_false_positive_count": 1
+  },
+  "status": "CALIBRATED",
+  "retrieval": {
+    "kind": "hybrid-rrf",
+    "top_k": 3,
+    "rrf_k": 60,
+    "admission": {
+      "minimum_vector_score": 0.6,
+      "minimum_keyword_coverage": 0.1,
+      "minimum_margin": 0.0005
+    },
+    "fact_evidence": {
+      "minimum_coverage": 0.25,
+      "minimum_terms": 1
+    }
+  },
+  "calibration_metrics": {
+    "sample_count": 16,
+    "answerable_count": 8,
+    "no_answer_count": 8,
+    "recall_at_1": 0.875,
+    "recall_at_3": 0.875,
+    "mrr": 0.875,
+    "no_answer_correct_rejection_rate": 1.0,
+    "false_positive_count": 0,
+    "questions": []
+  },
+  "quality_gate_result": {
+    "passed": true,
+    "checks": {
+      "recall_at_1": true,
+      "recall_at_3": true,
+      "mrr": true,
+      "no_answer_correct_rejection_rate": true,
+      "false_positive_count": true
+    }
+  }
+}

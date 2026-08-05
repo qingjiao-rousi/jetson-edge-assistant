@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1B-R2.1",
+  "split": "diagnostic-dev-expanded-fact-evidence",
+  "questions": [
+    {"id":"diag21-ax-torque","query":"What is the rated shaft torque of AX-17?","expected_chunk_id":"AX17-MANUAL-001#technical-specifications"},
+    {"id":"diag21-ax-inspection","query":"How frequently is scheduled AX-17 inspection required?","expected_chunk_id":"AX17-MANUAL-001#maintenance-schedule"},
+    {"id":"diag21-ax-e42","query":"On AX-17, is E42 a cooling-flow or motor-temperature fault?","expected_chunk_id":"AX17-MANUAL-001#alarm-e42"},
+    {"id":"diag21-bx-pressure","query":"What is the BX-9 nominal outlet pressure?","expected_chunk_id":"BX9-MANUAL-001#technical-specifications"},
+    {"id":"diag21-bx-temperature","query":"What fluid temperature range is permitted for BX-9?","expected_chunk_id":"BX9-MANUAL-001#technical-specifications"},
+    {"id":"diag21-bx-bubbles","query":"What should be inspected when vapor formation disrupts BX-9 suction flow?","expected_chunk_id":"BX9-MANUAL-001#cavitation-warning"},
+    {"id":"diag21-ct-t17","query":"What does tracking warning T17 indicate on CT-4?","expected_chunk_id":"CT4-MANUAL-001#belt-tracking"},
+    {"id":"diag21-ct-maintenance","query":"When are CT-4 belt tension and alignment inspected?","expected_chunk_id":"CT4-MANUAL-001#maintenance-schedule"},
+    {"id":"diag21-no-ax-viscosity","query":"What lubricant viscosity is required by AX-17?","expected_chunk_id":null},
+    {"id":"diag21-no-bx-reset","query":"What is the BX-9 emergency-stop reset sequence?","expected_chunk_id":null},
+    {"id":"diag21-no-ct-e42","query":"CT-4 的 E42 故障码表示什么？","expected_chunk_id":null},
+    {"id":"diag21-no-ct-bearing","query":"CT-4 轴承规定多少小时更换？","expected_chunk_id":null},
+    {"id":"diag21-no-ax-motor","query":"Does AX-17 E42 identify motor winding temperature?","expected_chunk_id":null},
+    {"id":"diag21-no-bx-schedule","query":"Does BX-9 require a belt tracking inspection schedule?","expected_chunk_id":null},
+    {"id":"diag21-no-ct-pressure","query":"CT-4 输送带允许的液压压力范围是多少？","expected_chunk_id":null},
+    {"id":"diag21-no-ax-leakage","query":"AX-17 的 E42 是否规定燃油泄漏阈值？","expected_chunk_id":null}
+  ]
+}
