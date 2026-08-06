@@ -10,7 +10,7 @@ KV Cache 或 `mtmd`；自研范围主要是 Jetson 适配、Runtime/Service 封�
 
 状态日期：2026-08-06。
 
-项目已完成第 1～8 周的 Jetson 基线、文本 Runtime、量化评测、VLM 图片链路和
+项目已完成第 1～8 的 Jetson 基线、文本 Runtime、量化评测、VLM 图片链路和
 应用单图 API、M9.2 手册问答原型、M10.1 单热文本 KV Prefix 复用，以及 M10.2 受限工具与进程内多会话 Agent 原型。M9.1B 已完成多文档索引、经审计的
 Qwen3-Embedding-0.6B Q8_0、本地向量/FTS5 混合检索、设备/故障码约束、引用和
 一次性最终评测流程。最新 R2.5 的 calibration 与 diagnostic 均通过，但独立
