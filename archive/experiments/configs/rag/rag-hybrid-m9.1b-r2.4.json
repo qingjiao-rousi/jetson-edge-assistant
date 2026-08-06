@@ -1,9 +1,0 @@
-{
-  "schema_version": 1,
-  "milestone": "M9.1B-R2.4",
-  "algorithm": "concept-lexical-evidence-v1",
-  "algorithm_fingerprint": "31aae901b2b39fb53b2b0cf5cfbbfda2fa95550abda6ebc4f1edc914dbe50c86",
-  "embedding_fingerprint": "d0540b3ebba59a403437b0866625bd5d8392484806b41716a95c528bab4547b9",
-  "retrieval": {"kind":"hybrid-rrf","top_k":3,"rrf_k":60,"admission":{"minimum_vector_score":0.4,"minimum_keyword_coverage":0.1,"minimum_margin":0.0001},"fact_evidence":{"minimum_coverage":0.25,"minimum_terms":1},"concept_lexical":{"minimum_coverage":0.25}},
-  "quality_gate": {"mode":"hybrid","minimum_recall_at_1":0.75,"minimum_recall_at_3":0.875,"minimum_mrr":0.8,"minimum_no_answer_correct_rejection_rate":0.75,"maximum_false_positive_count":1}
-}

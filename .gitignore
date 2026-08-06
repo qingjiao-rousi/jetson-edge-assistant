@@ -43,3 +43,8 @@ __pycache__/
 *.pcm
 *.mp3
 demo-output/
+
+archive/
+evidence/
+tools/
+generated/
