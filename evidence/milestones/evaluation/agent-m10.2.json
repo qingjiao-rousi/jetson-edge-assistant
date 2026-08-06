@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "milestone": "M10.2-B",
+  "status": "DONE",
+  "entrypoint": "scripts/agent_m10_2.py --jsonl",
+  "scope": "bounded process-local multi-session JSONL Agent",
+  "limits": {
+    "max_sessions": 8,
+    "max_turns_per_session": 20,
+    "max_agent_steps": 3,
+    "max_query_chars": 4096,
+    "max_session_id_chars": 128
+  },
+  "operations": ["answer", "explain", "reset", "health"],
+  "modes": {
+    "manual-grounded": "default device-fact mode; retrieval evidence and valid citations required",
+    "general-explanation": "explicit general knowledge mode; no manual citations and no operational guidance"
+  },
+  "allowed_tools": ["search_manuals", "read_manual", "lookup_fault_code"],
+  "acceptance": {
+    "same_session_turns": 2,
+    "session_isolation": true,
+    "reset_restarts_at_turn": 1,
+    "no_evidence_model_calls": 0,
+    "missing_citation_status": "CITATION_FORMAT_ERROR",
+    "general_explanation_status": "OK",
+    "general_explanation_citations": [],
+    "dangerous_general_explanation_status": "GENERAL_EXPLANATION_REJECTED",
+    "jsonl_one_response_per_input": true
+  },
+  "tests": {
+    "python_unittest": "97 passed",
+    "runtime_ctest": "4/5 passed; edgeomni_service_unit_test blocked because the verification environment cannot bind loopback"
+  },
+  "limitations": [
+    "process memory only",
+    "no persistence, LRU, TTL, or cross-process sharing",
+    "not Runtime-layer multi-session KV",
+    "no production authentication",
+    "general-explanation is not device diagnosis, repair authorization, or safety advice",
+    "no shell, network, arbitrary file write, or arbitrary Python execution"
+  ]
+}

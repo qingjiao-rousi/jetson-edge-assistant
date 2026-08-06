@@ -10,17 +10,16 @@
 **最终功能**: 工业现场实时音视频全双工多模态交互，以及离线设备知识检索与故障辅助
 **硬件平台**: Jetson AGX Orin 32GB
 **核心能力**: 离线 LLM/VLM 推理、GGUF/量化、KV Cache、Prefill/Decode、本地 RAG、受限工具和 systemd/Docker 部署
-**当前状态**: M1～M8 已收口；文本 Runtime、量化基线、VLM 单图 Runtime 与应用 API 已验证；当前进入 M9 RAG，M9.1A 关键词检索 MVP 已完成
+**当前状态**: Runtime、VLM、RAG、Agent、KV Prefix、语音网关与文本 UI 均有原型；主线运行代码位于 `runtime/` 与 `app/`，冻结结论位于 `evidence/`
 **项目周期**: 三个月端侧 Runtime/故障辅助主线；音视频全双工由其他模块并行集成；蒸馏或剪枝仅作为独立个人研究扩展
 
 ## 设计文档
 
 对话中可按需读取：
 
-- [业务背景、范围和成果表述边界](md/项目背景.md)
-- [项目概述与模块设计](md/项目实践-jetson端侧离线多模态智能助手.md)
-- [任务需求与技术设计说明](md/项目实践-jetson端侧任务需求.md)
-- [三个月开发计划与执行清单](md/三个月开发计划与执行清单.md)
+- [项目历史总结](archive/superseded/project-docs/总结.md)
+- [阶段证据](evidence/milestones/)
+- [周报](evidence/weekly-reports/)
 
 ## 参考上游项目
 
@@ -65,23 +64,16 @@
 
 ```
 vlmllm-main/
-  md/              — 设计文档
-  runtime/         — 自有 C++ Runtime Adapter
-  third_party/     — 固定个人 fork/submodule
-  patches/         — 上游修复和快照补丁
-  app/             — 自有代码（后续创建）
-    backend/       — llama.cpp-omni 适配层
-    request/       — 请求处理
-    response/      — 响应处理
-    metrics/       — 性能指标
-    tools/         — 工具调用
-    rag/           — 本地 RAG
-  models/          — 模型文件
-  configs/         — 配置文件
-  scripts/         — 部署脚本
-  tests/           — 测试
-  docker/          — Docker 相关
-  docs/            — 自有文档
+  runtime/         — C++ Runtime、HTTP API、KV Cache 和生命周期
+  app/             — Agent、audio、qa、retrieval、ui 主线服务
+  configs/         — 运行配置
+  knowledge/       — 本地设备手册
+  tests/           — unit、integration 和 fixtures
+  tools/           — benchmark、evaluation、maintenance 工具
+  evidence/        — milestones、benchmarks、weekly-reports
+  archive/         — experiments 与 superseded 历史
+  scripts/         — 薄启动器
+  third_party/     — 固定上游 fork
 ```
 
 ## 架构原则
@@ -133,8 +125,8 @@ vlmllm-main/
 6. **离线替换提醒** — 如果拟议的方案中出现了云端依赖（OpenAI API、Pinecone 等），主动提醒并给出本地替代建议
 7. **性能结论要实测** — 涉及模型速度、显存、精度等性能判断时，必须基于实际测量数据，不能推测
 8. **先设计再实现** — 涉及新模块或多文件修改时，先输出接口设计让用户确认，再写实现代码
-9. **保持上游分离** — 自有代码写在 `runtime/`、`scripts/` 或后续 `app/` 下，不直接修改 `third_party/llama.cpp-omni`、`../llama.cpp-omni-master/` 或 `../autonomous-intelligence-main/`
+9. **保持上游分离** — 自有代码写在 `runtime/`、`app/` 与 `tools/` 下，不直接修改 `third_party/llama.cpp-omni`、`../llama.cpp-omni-master/` 或 `../autonomous-intelligence-main/`
 
-当前项目状态统一查阅 [md/总结.md](md/总结.md)。本文件和历史设计文档中的阶段
+当前项目状态统一查阅 [历史总结](archive/superseded/project-docs/总结.md) 与 `evidence/`。本文件和历史设计文档中的阶段
 描述如与该总结冲突，以总结的状态日期为准；冻结实验事实仍以对应 evaluation
 报告为准。

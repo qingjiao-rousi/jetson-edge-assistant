@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "evaluation_type": "offline_ai_assisted_blind_quality_review",
+  "scorer": "ai_assisted",
+  "source_runs": ["benchmark-results/qwen3-quant-kv/20260728T033622Z", "benchmark-results/qwen3-quant-kv/20260728T035104Z"],
+  "sample_filter": {"phase": "measured", "valid": true, "preconditioning_excluded": true, "per_model": 15, "per_prompt_id": {"S": 5, "L": 5, "G": 5}},
+  "blind_review": {"samples": "benchmark-results/qwen3-quant-kv/quality-review-20260728/blind-samples.jsonl", "scores": "benchmark-results/qwen3-quant-kv/quality-review-20260728/score.jsonl", "candidate_mapping_applied_after_scoring": {"candidate_a": "q4_k_m", "candidate_b": "q8_0"}},
+  "mechanical_comparison": {
+    "same_prompt_outputs_exactly_equal_between_models": {"S": false, "L": false, "G": false},
+    "same_model_same_prompt_attempts_identical": {"q4_k_m": {"S": true, "L": true, "G": true}, "q8_0": {"S": true, "L": true, "G": true}},
+    "output_sha256": {"q4_k_m": {"S": "146145e9df9373aa67080c0bc4f45ecb9210295649650462b6c3834bbdf459a8", "L": "f7701a3a46cb2166d28282625f21ee40165e41fa0b5549721ed984daff4f5744", "G": "f1a7e31f2d80771b3912ba1da2eabb1a3d2b1511e33e7dd582b5fbd08890a3e2"}, "q8_0": {"S": "6e4cd508b698655e94f748394f65e2b765188954aa75e0b084e6a57adc2bfb6d", "L": "6f3f679628fb4bc95b05a64775a95b5a106305da632a00b1548d7151bdf2a1d1", "G": "6f532847b4e3d40f4f06f6b40ecb50fea214280302b36a74add8e8b764df6e0a"}},
+    "output_tokens": {"S": 32, "L": 32, "G": 256},
+    "all_finish_reason": "length",
+    "empty_output": false,
+    "garbled_text": false,
+    "format_break": {"S": false, "L": true, "G": true},
+    "unsupported_factual_claims": {"S": true, "L": false, "G": true}
+  },
+  "scores": {
+    "q4_k_m": {"S": {"count": 5, "relevance": 3, "factual_consistency": 1, "completeness": 3, "actionability": 1, "format_compliance": 4, "safety": 2, "total": 14}, "L": {"count": 5, "relevance": 3, "factual_consistency": 4, "completeness": 1, "actionability": 1, "format_compliance": 4, "safety": 4, "total": 17}, "G": {"count": 5, "relevance": 4, "factual_consistency": 1, "completeness": 2, "actionability": 1, "format_compliance": 4, "safety": 2, "total": 14}, "overall": {"count": 15, "relevance": 3.3333, "factual_consistency": 2.0, "completeness": 2.0, "actionability": 1.0, "format_compliance": 4.0, "safety": 2.6667, "total": 15.0}},
+    "q8_0": {"S": {"count": 5, "relevance": 3, "factual_consistency": 1, "completeness": 3, "actionability": 1, "format_compliance": 4, "safety": 2, "total": 14}, "L": {"count": 5, "relevance": 3, "factual_consistency": 5, "completeness": 1, "actionability": 1, "format_compliance": 3, "safety": 4, "total": 17}, "G": {"count": 5, "relevance": 4, "factual_consistency": 1, "completeness": 2, "actionability": 1, "format_compliance": 4, "safety": 2, "total": 14}, "overall": {"count": 15, "relevance": 3.3333, "factual_consistency": 2.3333, "completeness": 2.0, "actionability": 1.0, "format_compliance": 3.6667, "safety": 2.6667, "total": 15.0}}
+  },
+  "quality_ranking": {"result": "tie_unable_to_distinguish", "basis": "S/L/G total scores are 14/17/14 for both models; small dimension differences in L do not establish a ranking."},
+  "performance_ranking_retained_separately": {"primary_engineering_candidate": "q4_k_m", "high_precision_comparison_candidate": "q8_0", "source": "manifests/quantization-deployment-baseline-v1.json"},
+  "limitations": ["AI-assisted scorer only; no independent human review.", "Only three fixed prompt classes (S/L/G), five deterministic repeats each.", "All outputs reached max_new_tokens with finish_reason=length.", "No general-knowledge, factual-QA, or real device-fault dataset is present.", "No claim about universal Q4/Q8 quality follows from this review.", "Final deployment choice must jointly consider quality, decode throughput, startup time, power, memory, and OOM risk."]
+}

@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "status": "FROZEN",
+  "decision_id": "quantization-deployment-baseline-v1",
+  "decision_date": "2026-07-28",
+  "scope": "M6 Qwen3 weight quantization deployment choice",
+  "does_not_replace": "manifests/deployment-baseline-v1.json",
+  "primary_deployment_candidate": {
+    "id": "q4_k_m",
+    "path": "models/Qwen3-4B-Q4_K_M.gguf",
+    "quantization": "Q4_K_M",
+    "size_bytes": 2497280256,
+    "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+    "source_repo": "Qwen/Qwen3-4B-GGUF",
+    "source_revision": "a9a60d009fa7ff9606305047c2bf77ac25dbec49",
+    "license": "Apache-2.0"
+  },
+  "high_precision_comparison_candidate": {
+    "id": "q8_0",
+    "path": "models/Qwen3-4B-Q8_0.gguf",
+    "quantization": "Q8_0",
+    "size_bytes": 4280404704,
+    "sha256": "8c2f07f26af9747e41988551106f149b03eb9b5cb6df636027b6bf6278473300",
+    "source_repo": "Qwen/Qwen3-4B-GGUF",
+    "source_revision": "a9a60d009fa7ff9606305047c2bf77ac25dbec49",
+    "license": "Apache-2.0"
+  },
+  "runtime": {
+    "path": "third_party/llama.cpp-omni",
+    "branch": "jetson-runtime-dev",
+    "commit": "19cc26967140407efe34006a355ab445b35b16ac"
+  },
+  "kv_cache": {
+    "k": "f16",
+    "v": "f16",
+    "q8_or_q4_kv_enabled": false,
+    "reason": "DirectBackend has not exposed a controlled K/V type configuration; do not infer CLI/common capability as Runtime capability."
+  },
+  "fixed_runtime": {
+    "context_tokens": 4096,
+    "batch_tokens": 512,
+    "ubatch_tokens": 512,
+    "gpu_layers": 99,
+    "flash_attention": "on",
+    "kv_offload": true,
+    "parallel_sequences": 1,
+    "power_mode": "MODE_30W",
+    "power_mode_id": 2
+  },
+  "sampling": {
+    "seed": 424242,
+    "top_k": 1,
+    "top_p": 1.0,
+    "min_p": 0.0,
+    "temperature": 0.0,
+    "reasoning": "off"
+  },
+  "evidence": {
+    "report": "docs/evaluation/qwen3-quant-kv-final-20260728.md",
+    "report_json": "docs/evaluation/qwen3-quant-kv-final-20260728.json",
+    "benchmark_runs": [
+      "benchmark-results/qwen3-quant-kv/20260728T033622Z",
+      "benchmark-results/qwen3-quant-kv/20260728T035104Z"
+    ],
+    "provenance_sha256": "8bfdf9d20a659b4c4eeb7f49d547f4b086b548f92b8211d7dbb0b981a25ae91c",
+    "benchmark_script_sha256": "bc799b5a19a09cf23f18424b6860655141118d0d1bac5462c294b8912ec423f1",
+    "benchmark_runner_sha256": "699ebf18c8f80cba93c8b1ca337e0832e2ba9c31db8f11811698c566e8b62cc7",
+    "config_sha256": "a3864ab3e01af05db8b0c2b43c18e663abbc3a2750aa7af535ed2c580032b110",
+    "asset_manifest_sha256": "09c4b23c99faa6b7c572be545fef952243c6d7b5dc4610924fc901d6d789df5b",
+    "deployment_baseline_manifest_sha256": "0ce83292ca573b408b0a45153460de46782b46aed869394acd519850fffa8096"
+  },
+  "conclusions": {
+    "engineering_performance": "Q4_K_M is the first-stage edge deployment priority candidate; Q8_0 is the high-precision comparison candidate.",
+    "quality": "No independent Q4/Q8 quality evaluation is complete. This decision makes no quality ranking claim.",
+    "finish_reason_length": "All final measured rows ended at max_new_tokens; this is a throughput/resource limitation, not a quality result.",
+    "historical_oom": "Historical incomplete runs recorded OOM/allocation failures (final-q4: 5 failed, final-q8: 2 failed); the two cited final complete runs have zero failed records.",
+    "deployment_gate": "Use the frozen hashes, Runtime commit, F16/F16 KV and fixed runtime/sampling values together; do not silently change any value."
+  },
+  "next_phase": {
+    "phase": "weeks_7_8",
+    "focus": "VLM image-input design and minimal supported image capability",
+    "out_of_scope_here": ["VLM implementation", "RAG", "Agent", "Docker", "systemd"]
+  }
+}

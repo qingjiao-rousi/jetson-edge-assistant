@@ -1,7 +1,8 @@
-# Model weights
-models/**/*.gguf
-models/*.gguf
+# Local model assets
+models/
 *.gguf
+.venv/
+generated/
 
 # Native and CMake build trees
 build/
@@ -21,11 +22,14 @@ tmp/
 temp/
 *.tmp
 *.sqlite3
+*.sqlite
+*.db
 *.swp
 *~
 
 # Python and editor state
 __pycache__/
+**/__pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
@@ -33,3 +37,9 @@ __pycache__/
 .idea/
 .vscode/
 .DS_Store
+
+# Local audio and demonstration output
+*.wav
+*.pcm
+*.mp3
+demo-output/

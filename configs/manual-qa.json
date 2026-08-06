@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.2-PROTOTYPE",
+  "retrieval_config": "configs/manual-retrieval.json",
+  "embedding_config": "configs/embedding.json",
+  "database": "generated/rag-m9.1b-r2.2/hybrid.sqlite3",
+  "model_endpoint": "http://127.0.0.1:18086/v1/chat",
+  "max_new_tokens": 256,
+  "timeout_seconds": 120
+}

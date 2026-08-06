@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "milestone": "M7.4C-R",
+  "attempt_ordinal": 2,
+  "previous_inference_attempt_count": 1,
+  "retry_count": 1,
+  "runtime": {"path": "third_party/llama.cpp-omni", "commit": "19cc26967140407efe34006a355ab445b35b16ac"},
+  "binary": {"path": "third_party/llama.cpp-omni/build-jetson-release/bin/llama-mtmd-cli", "size_bytes": 67520, "sha256": "454227ac3ea4b07631e3da62cec1157f8e75442e1d3fe8c02aece2d1759168d0"},
+  "assets": {
+    "main_model": {"path": "models/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf", "size_bytes": 1929901056, "sha256": "d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12"},
+    "mmproj": {"path": "models/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf", "size_bytes": 844757728, "sha256": "980c9b2f78c04e6cff93d277ada09e768394f112d75db3b4e9dea8a69f9fb904"},
+    "image": {"path": "third_party/llama.cpp-omni/tools/mtmd/test-1.jpeg", "size_bytes": 124071, "sha256": "2dff664c0c8aaea18aff8cbe7e868845b775e90cdd7a0bac98df709b131deaa3"}
+  },
+  "fixture": {"path": "benchmark-results/vlm-long-context-16384/20260730-052012-814635-0400/fixture.txt", "size_bytes": 73703, "sha256": "4ddfe0e50411670bffefa87b2715df90a43ef4c99502f9dd6257978820eecdef", "raw_token_count": 13301, "direct_prompt_token_min": 13000, "direct_prompt_token_max": 14500, "expected_publisher_substring": "The New York Times"},
+  "readonly_references": {
+    "m7_4c_failure": {"path": "benchmark-results/vlm-long-context-16384/20260730-052012-814635-0400/result.json", "size_bytes": 8098, "sha256": "9420cd706703f6b6a122d238e86c66f5508c13b8fcea892a792029a4175b8bf0"},
+    "m7_4c_audit": {"path": "evidence/milestones/evaluation/vlm-cuda-audit-m7.4cd.json", "size_bytes": 1992, "sha256": "815ecfc2340d42c6852fb67044b79a35327d551440e253c36936bba76d8ca791"},
+    "m7_4c_config": {"path": "evidence/milestones/configs/vlm/vlm-long-context-m7.4c.json", "size_bytes": 3705, "sha256": "94730c5a3b3659ea9ef239887e5493b78ed57e1b2d4e129b4a5b97b974a1abf7"},
+    "m7_4c_runner": {"path": "tools/benchmark/run_vlm_long_context_m7_4c.py", "size_bytes": 18639, "sha256": "cb7cdc0127bd32e24e6afe49e458232b7f24ac07fd9e21445f307d6fa79919a4"},
+    "recovery_runner": {"path": "tools/benchmark/run_vlm_recovery.py", "size_bytes": 7921, "sha256": "17f37b1f1398933eca045c80e56e9d713ccf0e8b5e333e527d050d94bd5bd037"}
+  },
+  "fixed_parameters": {"context": 16384, "batch": 512, "ubatch": 512, "gpu_layers": 99, "flash_attention": "on", "temperature": 0, "seed": 424242, "max_new_tokens": 128, "mmproj_offload": true, "offline": true, "warmup": false, "chat_mode": false, "prompt_source": "--file"},
+  "launcher": {"timeout_seconds": 900, "timeout_kill_after_seconds": 30, "tegrastats_interval_ms": 250, "cleanup_grace_seconds": 5, "output_root": "benchmark-results/vlm-long-context-16384-recovery"},
+  "policy": {"automatic_download": false, "runtime_source_changes_allowed": false, "model_starts_allowed": 1, "third_attempt_allowed": false, "context_32768_executed": false, "rag_enabled": false, "agent_enabled": false, "multi_session_enabled": false}
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "milestone": "M11-PROTOTYPE",
+  "sample_rate": 16000,
+  "tts_sample_rate": 8000,
+  "channels": 1,
+  "input_device": null,
+  "output_device": null,
+  "asr_model": {
+    "path": "models/sherpa-onnx/asr/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/encoder-epoch-99-avg-1.int8.onnx",
+    "size_bytes": 21621684,
+    "sha256": "1c556ea57cec304e55ec4b72e52c1cc098bb01476ed7d90f3de939fe126487b1",
+    "language": "zh",
+    "sample_rate": 16000,
+    "license": "Apache-2.0"
+  },
+  "vad_model": {
+    "path": "models/sherpa-onnx/silero_vad.onnx",
+    "size_bytes": 2327524,
+    "sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+    "language": "zh",
+    "sample_rate": 16000,
+    "license": "MIT"
+  },
+  "tts_model": {
+    "path": "models/sherpa-onnx/tts/vits-aishell3.int8.onnx",
+    "size_bytes": 39870124,
+    "sha256": "5ef667dbbe0795688da93d779828cf38e6ad8ef8e82aa7dc5804873a50556057",
+    "language": "zh",
+    "sample_rate": 8000,
+    "license": "Apache-2.0"
+  },
+  "agent_command": ["python3", "scripts/run_agent.py", "--jsonl"],
+  "session_id": "voice-session-001",
+  "max_record_seconds": 15,
+  "silence_timeout_seconds": 2
+}

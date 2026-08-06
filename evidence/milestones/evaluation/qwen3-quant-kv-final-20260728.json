@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "report_date": "2026-07-28",
+  "source_runs": [
+    "benchmark-results/qwen3-quant-kv/20260728T033622Z",
+    "benchmark-results/qwen3-quant-kv/20260728T035104Z"
+  ],
+  "validation": {
+    "q4_complete": true,
+    "q8_complete": true,
+    "q4_valid_measured": 15,
+    "q8_valid_measured": 15,
+    "groups": {"S": {"q4": 5, "q8": 5}, "L": {"q4": 5, "q8": 5}, "G": {"q4": 5, "q8": 5}},
+    "prompt_tokens": {"S": 45, "L": 2031, "G": 59},
+    "failure_records_in_source_runs": 0,
+    "finish_reason_measured": "length",
+    "finish_reason_note": "All measured rows reached the configured max_new_tokens and are valid under the protocol; this is not evidence of natural stop or complete task output."
+  },
+  "environment": {
+    "project_branch": "main",
+    "project_commit": "2d72b69bbafd0ff27e88d0de3c7bbfe6a6d5d5e3",
+    "project_dirty": false,
+    "runtime_branch": "jetson-runtime-dev",
+    "runtime_commit": "19cc26967140407efe34006a355ab445b35b16ac",
+    "runtime_dirty": false,
+    "kv_cache": {"k": "f16", "v": "f16"},
+    "runtime_first_token_ms_is_service_ttft": false,
+    "fixed_runtime": {"context_tokens": 4096, "batch_tokens": 512, "ubatch_tokens": 512, "gpu_layers": 99, "flash_attention": "on", "kv_offload": true, "parallel_sequences": 1, "power_mode": "MODE_30W", "power_mode_id": 2},
+    "sampling": {"seed": 424242, "top_k": 1, "top_p": 1.0, "min_p": 0.0, "temperature": 0.0}
+  },
+  "provenance": {
+    "identical_across_q4_q8": true,
+    "provenance_sha256": "8bfdf9d20a659b4c4eeb7f49d547f4b086b548f92b8211d7dbb0b981a25ae91c",
+    "benchmark_script_sha256": "bc799b5a19a09cf23f18424b6860655141118d0d1bac5462c294b8912ec423f1",
+    "benchmark_runner_sha256": "699ebf18c8f80cba93c8b1ca337e0832e2ba9c31db8f11811698c566e8b62cc7",
+    "config_sha256": "a3864ab3e01af05db8b0c2b43c18e663abbc3a2750aa7af535ed2c580032b110",
+    "asset_manifest_sha256": "09c4b23c99faa6b7c572be545fef952243c6d7b5dc4610924fc901d6d789df5b",
+    "deployment_baseline_manifest_sha256": "0ce83292ca573b408b0a45153460de46782b46aed869394acd519850fffa8096"
+  },
+  "models": {
+    "q4_k_m": {"path": "models/Qwen3-4B-Q4_K_M.gguf", "quantization": "Q4_K_M", "size_bytes": 2497280256, "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5", "architecture": "qwen3", "gguf_version": 3, "tensor_count": 398, "quantization_version": 2, "context_length": 40960, "block_count": 36, "chat_template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361"},
+    "q8_0": {"path": "models/Qwen3-4B-Q8_0.gguf", "quantization": "Q8_0", "size_bytes": 4280404704, "sha256": "8c2f07f26af9747e41988551106f149b03eb9b5cb6df636027b6bf6278473300", "architecture": "qwen3", "gguf_version": 3, "tensor_count": 398, "quantization_version": 2, "context_length": 40960, "block_count": 36, "chat_template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361"}
+  },
+  "metrics_definition": {"model_ready_ms": "process initialize through model/context ready", "prefill_ms": "prompt batch processing", "first_token_ms": "Runtime-local generate_text timing; not service TTFT", "total_ms": "Runtime request total", "decode_ms": "sampling/decode loop", "decode_tokens_per_second": "output tokens divided by decode_ms", "peak_ram_mb": "tegrastats RAM peak; UMA system RAM, not discrete VRAM", "peak_gpu_temp_c": "tegrastats GPU peak", "peak_tj_temp_c": "tegrastats TJ peak", "peak_vdd_gpu_soc_mw": "tegrastats GPU/SOC rail peak"},
+  "statistics": {
+    "q4_k_m": {
+      "S": {"model_ready_ms":{"count":5,"mean":2047.4,"median":2046.0,"min":2022.0,"max":2086.0},"prefill_ms":{"count":5,"mean":230.6,"median":233.0,"min":223.0,"max":234.0},"first_token_ms":{"count":5,"mean":246.0,"median":247.0,"min":239.0,"max":251.0},"total_ms":{"count":5,"mean":3137.6,"median":3135.0,"min":3127.0,"max":3153.0},"decode_ms":{"count":5,"mean":2905.0,"median":2908.0,"min":2892.0,"max":2917.0},"decode_tokens_per_second":{"count":5,"mean":11.0156,"median":11.0041,"min":10.9702,"max":11.0650},"peak_ram_mb":{"count":5,"mean":17402.2,"median":17395.0,"min":17324.0,"max":17515.0},"peak_gpu_temp_c":{"count":5,"mean":54.0,"median":54.0,"min":54.0,"max":54.0},"peak_tj_temp_c":{"count":5,"mean":55.6,"median":56.0,"min":55.0,"max":56.0},"peak_vdd_gpu_soc_mw":{"count":5,"mean":8408.2,"median":8409.0,"min":8405.0,"max":8409.0}},
+      "L": {"model_ready_ms":{"count":5,"mean":2150.6,"median":2150.0,"min":2131.0,"max":2178.0},"prefill_ms":{"count":5,"mean":5206.0,"median":5205.0,"min":5194.0,"max":5226.0},"first_token_ms":{"count":5,"mean":5230.2,"median":5228.0,"min":5218.0,"max":5250.0},"total_ms":{"count":5,"mean":8193.2,"median":8195.0,"min":8181.0,"max":8210.0},"decode_ms":{"count":5,"mean":2977.2,"median":2976.0,"min":2974.0,"max":2981.0},"decode_tokens_per_second":{"count":5,"mean":10.7484,"median":10.7527,"min":10.7347,"max":10.7599},"peak_ram_mb":{"count":5,"mean":17775.6,"median":17777.0,"min":17680.0,"max":17865.0},"peak_gpu_temp_c":{"count":5,"mean":55.0,"median":55.0,"min":55.0,"max":55.0},"peak_tj_temp_c":{"count":5,"mean":56.2,"median":56.0,"min":56.0,"max":57.0},"peak_vdd_gpu_soc_mw":{"count":5,"mean":8790.2,"median":8791.0,"min":8787.0,"max":8791.0}},
+      "G": {"model_ready_ms":{"count":5,"mean":2211.8,"median":2211.0,"min":2193.0,"max":2237.0},"prefill_ms":{"count":5,"mean":257.8,"median":259.0,"min":250.0,"max":263.0},"first_token_ms":{"count":5,"mean":273.8,"median":274.0,"min":265.0,"max":279.0},"total_ms":{"count":5,"mean":23483.8,"median":23494.0,"min":23460.0,"max":23498.0},"decode_ms":{"count":5,"mean":23224.2,"median":23233.0,"min":23209.0,"max":23237.0},"decode_tokens_per_second":{"count":5,"mean":11.0230,"median":11.0188,"min":11.0169,"max":11.0302},"peak_ram_mb":{"count":5,"mean":18035.8,"median":18032.0,"min":17972.0,"max":18095.0},"peak_gpu_temp_c":{"count":5,"mean":56.2,"median":56.0,"min":56.0,"max":57.0},"peak_tj_temp_c":{"count":5,"mean":57.6,"median":58.0,"min":57.0,"max":58.0},"peak_vdd_gpu_soc_mw":{"count":5,"mean":8791.0,"median":8791.0,"min":8791.0,"max":8791.0}}
+    },
+    "q8_0": {
+      "S": {"model_ready_ms":{"count":5,"mean":3352.0,"median":3361.0,"min":3327.0,"max":3367.0},"prefill_ms":{"count":5,"mean":217.6,"median":217.0,"min":214.0,"max":224.0},"first_token_ms":{"count":5,"mean":236.2,"median":234.0,"min":232.0,"max":244.0},"total_ms":{"count":5,"mean":3211.4,"median":3213.0,"min":3193.0,"max":3230.0},"decode_ms":{"count":5,"mean":2992.4,"median":2993.0,"min":2977.0,"max":3012.0},"decode_tokens_per_second":{"count":5,"mean":10.6939,"median":10.6916,"min":10.6242,"max":10.7491},"peak_ram_mb":{"count":5,"mean":17019.0,"median":17020.0,"min":16978.0,"max":17058.0},"peak_gpu_temp_c":{"count":5,"mean":54.8,"median":55.0,"min":54.0,"max":55.0},"peak_tj_temp_c":{"count":5,"mean":56.2,"median":56.0,"min":56.0,"max":57.0},"peak_vdd_gpu_soc_mw":{"count":5,"mean":9929.0,"median":9929.0,"min":9929.0,"max":9929.0}},
+      "L": {"model_ready_ms":{"count":5,"mean":3384.6,"median":3389.0,"min":3372.0,"max":3395.0},"prefill_ms":{"count":5,"mean":4580.6,"median":4579.0,"min":4574.0,"max":4593.0},"first_token_ms":{"count":5,"mean":4606.6,"median":4605.0,"min":4602.0,"max":4618.0},"total_ms":{"count":5,"mean":7608.2,"median":7611.0,"min":7596.0,"max":7615.0},"decode_ms":{"count":5,"mean":3018.2,"median":3022.0,"min":3010.0,"max":3026.0},"decode_tokens_per_second":{"count":5,"mean":10.6024,"median":10.5890,"min":10.5750,"max":10.6312},"peak_ram_mb":{"count":5,"mean":17114.8,"median":17109.0,"min":17086.0,"max":17149.0},"peak_gpu_temp_c":{"count":5,"mean":55.6,"median":56.0,"min":55.0,"max":56.0},"peak_tj_temp_c":{"count":5,"mean":57.0,"median":57.0,"min":57.0,"max":57.0},"peak_vdd_gpu_soc_mw":{"count":5,"mean":10159.2,"median":10311.0,"min":9929.0,"max":10311.0}},
+      "G": {"model_ready_ms":{"count":5,"mean":3404.6,"median":3404.0,"min":3393.0,"max":3423.0},"prefill_ms":{"count":5,"mean":239.4,"median":241.0,"min":232.0,"max":246.0},"first_token_ms":{"count":5,"mean":257.6,"median":258.0,"min":251.0,"max":264.0},"total_ms":{"count":5,"mean":23658.2,"median":23650.0,"min":23639.0,"max":23685.0},"decode_ms":{"count":5,"mean":23416.8,"median":23403.0,"min":23402.0,"max":23451.0},"decode_tokens_per_second":{"count":5,"mean":10.9323,"median":10.9388,"min":10.9164,"max":10.9392},"peak_ram_mb":{"count":5,"mean":17232.2,"median":17230.0,"min":17220.0,"max":17241.0},"peak_gpu_temp_c":{"count":5,"mean":57.4,"median":57.0,"min":57.0,"max":58.0},"peak_tj_temp_c":{"count":5,"mean":59.0,"median":59.0,"min":58.0,"max":60.0},"peak_vdd_gpu_soc_mw":{"count":5,"mean":10311.0,"median":10311.0,"min":10311.0,"max":10311.0}}
+    }
+  },
+  "historical_failures": [
+    {"run": "benchmark-results/qwen3-quant-kv/20260727T140113Z", "failed": 18, "failure_class": "workload_token_target_mismatch", "impact": "not included in final statistics"},
+    {"run": "benchmark-results/qwen3-quant-kv/20260727T140949Z", "failed": 18, "failure_class": "model_hash_mismatch", "impact": "not included in final statistics"},
+    {"run": "benchmark-results/qwen3-quant-kv/final-q4", "failed": 5, "failure_class": "oom_or_allocation_failed", "valid_measured": 11, "impact": "incomplete historical run; not used for final Q4 statistics"},
+    {"run": "benchmark-results/qwen3-quant-kv/final-q8", "failed": 2, "failure_class": "oom_or_allocation_failed", "valid_measured": 14, "impact": "incomplete historical run; not used for final Q8 statistics"}
+  ],
+  "recommendation": {"engineering_performance": "Q4_K_M is the current edge deployment priority candidate: it has lower model_ready_ms and generally slightly higher decode throughput in these two runs, while Q8_0 has lower measured RAM peaks but higher VDD_GPU_SOC peaks.", "quality": "No independent quality evaluation is present in these results. Do not infer Q4/Q8 quality from speed or resource metrics.", "license_and_deployment": "Both artifacts are Qwen/Qwen3-4B-GGUF lineage, Apache-2.0 in the asset manifest, with the audited hashes and frozen runtime provenance. Deployment remains subject to the recorded model/license and Jetson power/thermal conditions.", "q8_role": "Q8_0 remains the higher-precision comparison or quality-priority candidate."},
+  "limitations": ["Only F16/F16 KV was measured.", "Runtime first_token_ms is not service TTFT; no service TTFT or TPOT was measured.", "All valid rows ended at max_new_tokens (finish_reason=length), so this is a throughput/resource comparison, not a natural-completion quality test.", "S/L/G each have only five measured samples per model.", "tegrastats values are peak observations; UMA RAM is not discrete VRAM and VDD_GPU_SOC is not whole-system power.", "No independent perplexity, task accuracy, human preference, or output-quality data is available."]
+}

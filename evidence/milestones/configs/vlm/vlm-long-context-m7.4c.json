@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "milestone": "M7.4C",
+  "status": "ACTIVE_SINGLE_RUN_PROTOCOL",
+  "runtime": {
+    "path": "third_party/llama.cpp-omni",
+    "commit": "19cc26967140407efe34006a355ab445b35b16ac"
+  },
+  "binaries": {
+    "inference": {
+      "path": "third_party/llama.cpp-omni/build-jetson-release/bin/llama-mtmd-cli",
+      "size_bytes": 67520,
+      "sha256": "454227ac3ea4b07631e3da62cec1157f8e75442e1d3fe8c02aece2d1759168d0"
+    },
+    "tokenizer": {
+      "path": "third_party/llama.cpp-omni/build-jetson-release/bin/llama-tokenize",
+      "size_bytes": 29040,
+      "sha256": "1012999431de6d4f778759f7e6464e7f9578b3a8fe2f620dbf8af3aa563b2b03"
+    }
+  },
+  "assets": {
+    "main_model": {
+      "path": "models/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf",
+      "size_bytes": 1929901056,
+      "sha256": "d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12"
+    },
+    "mmproj": {
+      "path": "models/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf",
+      "size_bytes": 844757728,
+      "sha256": "980c9b2f78c04e6cff93d277ada09e768394f112d75db3b4e9dea8a69f9fb904"
+    },
+    "image": {
+      "path": "third_party/llama.cpp-omni/tools/mtmd/test-1.jpeg",
+      "size_bytes": 124071,
+      "sha256": "2dff664c0c8aaea18aff8cbe7e868845b775e90cdd7a0bac98df709b131deaa3"
+    }
+  },
+  "readonly_references": {
+    "m7_4b_result": {
+      "path": "benchmark-results/vlm-long-context/20260730-044757-968503-0400/result.json",
+      "size_bytes": 10588,
+      "sha256": "fbc3b5201c519c1704bd5b4d23178adab412f12f572b75743baa8512f9ce4733"
+    },
+    "m7_4b_evaluation": {
+      "path": "evidence/milestones/evaluation/vlm-qwen25-3b-long-context-8192-m7.4b.json",
+      "size_bytes": 6052,
+      "sha256": "fc3f1b4b29bbfa53e1ebfac5363270b37a89e2b05974e06dc03dca6bb2c8b8a1"
+    },
+    "m7_4b_runner": {
+      "path": "tools/benchmark/run_vlm_long_context.py",
+      "size_bytes": 29916,
+      "sha256": "2c56c70ac3ac9409baace4069365757dfa5186195e1d84824af7ff0a798754de"
+    },
+    "m7_4b_config": {
+      "path": "evidence/milestones/configs/vlm/vlm-long-context-m7.4b.json",
+      "size_bytes": 4136,
+      "sha256": "dfa51920258c358fe2c466138c6f4e7714dd839a631361f19ecd5d412870c827"
+    }
+  },
+  "fixture": {
+    "generator": "tools/maintenance/generate_vlm_long_context_fixture_m7_4c.py",
+    "synthetic_only": true,
+    "contains_real_customer_information": false,
+    "filler_blocks_min": 185,
+    "filler_blocks_max": 210,
+    "raw_token_target_min": 12600,
+    "raw_token_target_max": 14100,
+    "direct_prompt_token_min": 13000,
+    "direct_prompt_token_max": 14500,
+    "facts": {
+      "start_code": "A17",
+      "middle_torque_nm": 42,
+      "reset_seconds": 7
+    },
+    "expected_publisher_substring": "The New York Times"
+  },
+  "fixed_parameters": {
+    "context": 16384,
+    "batch": 512,
+    "ubatch": 512,
+    "gpu_layers": 99,
+    "flash_attention": "on",
+    "temperature": 0,
+    "seed": 424242,
+    "max_new_tokens": 128,
+    "mmproj_offload": true,
+    "offline": true,
+    "warmup": false,
+    "chat_mode": false,
+    "prompt_source": "--file"
+  },
+  "launcher": {
+    "default_execute": false,
+    "execute_requires_flag": "--execute",
+    "timeout_seconds": 900,
+    "timeout_kill_after_seconds": 30,
+    "telemetry_interval_ms": 250,
+    "retry_count": 0,
+    "output_root": "benchmark-results/vlm-long-context-16384"
+  },
+  "policy": {
+    "automatic_download": false,
+    "hf_arguments_allowed": false,
+    "runtime_source_changes_allowed": false,
+    "contexts_executed": [16384],
+    "rag_enabled": false,
+    "agent_enabled": false,
+    "multi_session_enabled": false,
+    "performance_percentage_comparison_allowed": false,
+    "single_run_stability_or_deployment_claim_allowed": false,
+    "context_32768_executed": false
+  }
+}
