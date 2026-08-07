@@ -53,11 +53,29 @@ class OfflineAssetVerifierTest(unittest.TestCase):
         asr = asset("models/asr.onnx", b"asr")
         vad = asset("models/vad.onnx", b"vad")
         tts = asset("models/tts.onnx", b"tts")
-        source = asset("knowledge/manual.md", b"manual")
+        sources = [
+            asset("knowledge/manual-a.md", b"manual-a"),
+            asset("knowledge/manual-b.md", b"manual-b"),
+            asset("knowledge/manual-c.md", b"manual-c"),
+        ]
+        source_specs = [
+            {"source_path": source["path"], "document_id": f"DOC-{index}", "revision": "1",
+             "content_sha256": source["sha256"]}
+            for index, source in enumerate(sources, start=1)
+        ]
         database = root / "generated/rag-m9.1b-r2.2/hybrid.sqlite3"
         database.parent.mkdir(parents=True, exist_ok=True)
         connection = sqlite3.connect(database)
-        connection.execute("CREATE TABLE items (id INTEGER)")
+        connection.execute("CREATE TABLE documents (document_id TEXT, revision TEXT, source_path TEXT, content_sha256 TEXT)")
+        connection.execute("CREATE TABLE index_metadata (key TEXT, value TEXT)")
+        connection.executemany("INSERT INTO documents VALUES (?, ?, ?, ?)",
+                               [(item["document_id"], item["revision"], item["source_path"], item["content_sha256"])
+                                for item in source_specs])
+        connection.executemany("INSERT INTO index_metadata VALUES (?, ?)", [
+            ("algorithm_version", "test-algorithm"),
+            ("embedding_fingerprint", "test-embedding"),
+            ("r2_2_index_fingerprint", "test-index"),
+        ])
         connection.commit()
         connection.close()
         database_size = database.stat().st_size
@@ -73,15 +91,26 @@ class OfflineAssetVerifierTest(unittest.TestCase):
             "embedding": {"model_path": embedding["path"], "model_size_bytes": embedding["size_bytes"],
                           "model_sha256": embedding["sha256"]},
             "generated_database": "generated/rag-m9.1b-r2.2/hybrid.sqlite3",
-            "sources": [{"source_path": "knowledge/manual.md", "content_sha256": source["sha256"]}],
+            "sources": source_specs,
         }))
         def voice_spec(value): return {**value, "language": "zh", "sample_rate": 16000, "license": "Apache-2.0"}
         (root / "configs/voice-gateway.json").write_text(json.dumps({"asr_model": voice_spec(asr), "vad_model": voice_spec(vad), "tts_model": voice_spec(tts)}))
-        manifest = {"submodule": {"commit": COMMIT}}
-        write(root / "evidence/benchmarks/manifests/runtime.json", json.dumps(manifest).encode())
-        write(root / "evidence/milestones/evaluation/rag-hybrid-m9.1b-r2.2-index-manifest.json",
-              json.dumps({"database_size_bytes": database_size,
-                          "documents": [{"source_path": "knowledge/manual.md", "content_sha256": source["sha256"]}]}).encode())
+        write(root / "configs/contracts/runtime-contract.json", json.dumps({
+            "schema_version": 1,
+            "submodule": {"path": "third_party/llama.cpp-omni", "commit": COMMIT},
+            "upstream_build": {
+                "path": "third_party/llama.cpp-omni/build-jetson-release",
+                "build_inputs": ["bin/libllama.so", "bin/libmtmd.so", "bin/libggml.so", "bin/libggml-cuda.so"],
+                "assistant_tools": ["bin/llama-embedding", "bin/llama-tokenize"],
+            },
+        }).encode())
+        write(root / "configs/contracts/rag-r2.2-delivery-contract.json", json.dumps({
+            "schema_version": 1,
+            "database": {"path": "generated/rag-m9.1b-r2.2/hybrid.sqlite3", "size_bytes": database_size},
+            "index_metadata": {"algorithm_version": "test-algorithm", "embedding_fingerprint": "test-embedding",
+                               "r2_2_index_fingerprint": "test-index"},
+            "sources": source_specs,
+        }).encode())
         return root
 
     def tearDown(self):
@@ -131,6 +160,19 @@ class OfflineAssetVerifierTest(unittest.TestCase):
         self.assertEqual(code, verify.EXIT_VCS)
         self.assertTrue(any(item.id == "upstream.commit" and item.state == "fail" for item in checks))
 
+    def test_missing_delivery_contracts_fail(self):
+        root = self.make_tree()
+        (root / verify.RUNTIME_CONTRACT).unlink()
+        code, checks = self.verifier(root).run("contract")
+        self.assertEqual(code, verify.EXIT_FAILED)
+        self.assertTrue(any(item.id == "runtime_delivery_contract" and item.state == "fail" for item in checks))
+        self.temp.cleanup()
+        root = self.make_tree()
+        (root / verify.RAG_CONTRACT).unlink()
+        code, checks = self.verifier(root).run("assistant")
+        self.assertEqual(code, verify.EXIT_FAILED)
+        self.assertTrue(any(item.id == "rag_delivery_contract" and item.state == "fail" for item in checks))
+
     def test_sqlite_readonly_failure_and_json_cli_output(self):
         root = self.make_tree()
         database = root / "generated/rag-m9.1b-r2.2/hybrid.sqlite3"
@@ -144,6 +186,42 @@ class OfflineAssetVerifierTest(unittest.TestCase):
         self.assertEqual((code, result["exit_code"], result["status"]), (verify.EXIT_OK, verify.EXIT_OK, "pass"))
         self.assertEqual([item["id"] for item in result["checks"]], [item.id for item in self.verifier(root).run("contract")[1]])
         self.assertEqual(verify.main(["--root", str(root / "missing")]), verify.EXIT_USAGE)
+
+    def test_rag_contract_and_sqlite_bindings_fail_on_mismatch(self):
+        root = self.make_tree()
+        contract_path = root / verify.RAG_CONTRACT
+        contract = json.loads(contract_path.read_text())
+        contract["database"]["size_bytes"] += 1
+        contract_path.write_text(json.dumps(contract))
+        code, checks = self.verifier(root).run("assistant")
+        self.assertEqual(code, verify.EXIT_FAILED)
+        self.assertTrue(any(item.id == "rag.size" and item.state == "fail" for item in checks))
+        contract["database"]["size_bytes"] -= 1
+        contract_path.write_text(json.dumps(contract))
+        database = root / "generated/rag-m9.1b-r2.2/hybrid.sqlite3"
+        connection = sqlite3.connect(database)
+        connection.execute("UPDATE documents SET revision = ? WHERE document_id = ?", ("other", "DOC-1"))
+        connection.commit()
+        connection.close()
+        code, checks = self.verifier(root).run("assistant")
+        self.assertEqual(code, verify.EXIT_FAILED)
+        self.assertTrue(any(item.id == "rag.documents_binding" and item.state == "fail" for item in checks))
+        connection = sqlite3.connect(database)
+        connection.execute("UPDATE documents SET revision = ? WHERE document_id = ?", ("1", "DOC-1"))
+        connection.execute("UPDATE index_metadata SET value = ? WHERE key = ?", ("wrong", "algorithm_version"))
+        connection.commit()
+        connection.close()
+        code, checks = self.verifier(root).run("assistant")
+        self.assertEqual(code, verify.EXIT_FAILED)
+        self.assertTrue(any(item.id == "rag.metadata.algorithm_version" and item.state == "fail" for item in checks))
+        connection = sqlite3.connect(database)
+        connection.execute("UPDATE index_metadata SET value = ? WHERE key = ?", ("test-algorithm", "algorithm_version"))
+        connection.execute("UPDATE index_metadata SET value = ? WHERE key = ?", ("wrong", "embedding_fingerprint"))
+        connection.commit()
+        connection.close()
+        code, checks = self.verifier(root).run("assistant")
+        self.assertEqual(code, verify.EXIT_FAILED)
+        self.assertTrue(any(item.id == "rag.metadata.embedding_fingerprint" and item.state == "fail" for item in checks))
 
     def test_invalid_assistant_configuration_returns_usage_error(self):
         root = self.make_tree()

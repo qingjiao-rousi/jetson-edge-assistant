@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "database": {
+    "path": "generated/rag-m9.1b-r2.2/hybrid.sqlite3",
+    "size_bytes": 139264
+  },
+  "index_metadata": {
+    "algorithm_version": "concept-fact-family-v1",
+    "embedding_fingerprint": "d0540b3ebba59a403437b0866625bd5d8392484806b41716a95c528bab4547b9",
+    "r2_2_index_fingerprint": "efa33d208db4c9401b06233027e1fc3126051b6bf383bef81d4b3f6a104d103f"
+  },
+  "sources": [
+    {
+      "source_path": "knowledge/manuals/ax17-equipment-manual.md",
+      "document_id": "AX17-MANUAL-001",
+      "revision": "1",
+      "content_sha256": "e7d77a33de83ad7ea1aaf58e33376d9b086d05f9fb3df53fd7a5463e825bb213"
+    },
+    {
+      "source_path": "knowledge/manuals/bx9-hydraulic-pump-manual.md",
+      "document_id": "BX9-MANUAL-001",
+      "revision": "1",
+      "content_sha256": "fdf01931104932d06f281d9cbd900b123c1530dbf65a45264e1d467092f66adb"
+    },
+    {
+      "source_path": "knowledge/manuals/ct4-conveyor-manual.md",
+      "document_id": "CT4-MANUAL-001",
+      "revision": "1",
+      "content_sha256": "e7b4871c12367083588dfa02a0ad5e1c7d0af5b7b7928c930cf804ee056ca954"
+    }
+  ]
+}

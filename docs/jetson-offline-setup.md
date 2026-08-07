@@ -17,8 +17,8 @@ recorded toolchain is evidence, not a portability guarantee.
 
 ## Offline Inventory
 
-Git provides EdgeOmni source, CMake files, Python code, configs, tests, fixed image fixtures,
-`knowledge/`, and tracked evidence. `third_party/llama.cpp-omni` is a submodule pinned to
+Git provides EdgeOmni source, CMake files, Python code, configs, tracked delivery contracts, tests,
+fixed image fixtures, and `knowledge/`. `third_party/llama.cpp-omni` is a submodule pinned to
 `19cc26967140407efe34006a355ab445b35b16ac`. An offline repository bundle must include that exact
 submodule commit; do not rely on an online submodule update.
 
@@ -30,7 +30,7 @@ The following items are ignored by Git and must be supplied by an approved offli
 | VLM main model | `models/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf` | 1,929,901,056 bytes; SHA-256 `d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12`. |
 | VLM MMProj | `models/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf` | 844,757,728 bytes; SHA-256 `980c9b2f78c04e6cff93d277ada09e768394f112d75db3b4e9dea8a69f9fb904`. |
 | Embedding model | `models/embedding/Qwen3-Embedding-0.6B-Q8_0.gguf` | 639,150,592 bytes; SHA-256 `06507c7b42688469c4e7298b0a1e16deff06caf291cf0a5b278c308249c3e439`. |
-| RAG database | `generated/rag-m9.1b-r2.2/hybrid.sqlite3` | Prebuilt SQLite; 139,264 bytes and bound to the checked-in R2.2 manifest. Do not rebuild it here. |
+| RAG database | `generated/rag-m9.1b-r2.2/hybrid.sqlite3` | Prebuilt SQLite; its size, metadata, and source binding are in `configs/contracts/rag-r2.2-delivery-contract.json`. Do not rebuild it here. |
 | Optional voice assets | Paths in `configs/voice-gateway.json` | ASR/VAD/TTS files are checked only when the voice profile is selected. This does not validate devices or Python audio packages. |
 
 The VLM main model and MMProj are from `ggml-org/Qwen2.5-VL-3B-Instruct-GGUF`, revision
@@ -49,9 +49,9 @@ python3 scripts/verify_local_assets.py --root . --config configs/assistant.json 
 python3 scripts/verify_local_assets.py --root . --config configs/assistant.json --profile voice
 ```
 
-`contract` verifies source/config paths and the pinned local submodule commit. `build-inputs` adds
+`contract` verifies source/config paths, both tracked delivery contracts, and the pinned local submodule commit. `build-inputs` adds
 the frozen upstream build and AArch64 ELF checks. `assistant` adds the EdgeOmni Runtime host, VLM,
-embedding, RAG SQLite, source hashes, and manifests. `voice` includes `assistant` plus the declared
+embedding, RAG SQLite, source hashes, and delivery contracts. `voice` includes `assistant` plus the declared
 voice assets. The verifier uses only the standard library, streams SHA-256, opens SQLite using a
 read-only URI, and never invokes a model tool or opens a network connection.
 
@@ -59,6 +59,10 @@ Exit codes are `0` for a passing profile, `1` for a missing or mismatched contra
 invalid CLI use or an invalid assistant configuration, and `3` when local Git metadata cannot
 verify the required submodule commit.
 Use `--format json` for a stable JSON object with one result per check.
+
+The tracked contracts are `configs/contracts/runtime-contract.json` and
+`configs/contracts/rag-r2.2-delivery-contract.json`. `evidence/` is ignored historical material and
+is not an input to clean-clone preflight.
 
 ## Build Boundary
 

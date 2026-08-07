@@ -19,6 +19,8 @@ EXIT_FAILED = 1
 EXIT_USAGE = 2
 EXIT_VCS = 3
 UPSTREAM = "third_party/llama.cpp-omni"
+RUNTIME_CONTRACT = "configs/contracts/runtime-contract.json"
+RAG_CONTRACT = "configs/contracts/rag-r2.2-delivery-contract.json"
 
 
 @dataclass(frozen=True)
@@ -160,7 +162,8 @@ class Verifier:
         self.add(identifier + ".elf", ok, value, "ELF64 little-endian AArch64", "valid" if ok else "invalid",
                  "AArch64 ELF header" if ok else "not an AArch64 ELF binary")
 
-    def contract(self) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    def contract(self) -> tuple[dict[str, Any] | None, dict[str, Any] | None,
+                                dict[str, Any] | None, dict[str, Any] | None]:
         for name in ("CMakeLists.txt", "runtime/CMakeLists.txt", f"{UPSTREAM}/include", f"{UPSTREAM}/ggml/include",
                      f"{UPSTREAM}/tools/mtmd", f"{UPSTREAM}/vendor/cpp-httplib"):
             path = self.repo_path(name, "contract.path")
@@ -169,8 +172,10 @@ class Verifier:
                      "present" if exists else "required source path is missing")
         _, config = self.load_json(self.config_name, "assistant_config")
         _, embedding = self.load_json("configs/embedding.json", "embedding_config")
+        _, runtime_contract = self.load_json(RUNTIME_CONTRACT, "runtime_delivery_contract")
+        _, rag_contract = self.load_json(RAG_CONTRACT, "rag_delivery_contract")
         if config is None:
-            return None, embedding
+            return None, embedding, runtime_contract, rag_contract
         runtime = config.get("runtime")
         modules = config.get("modules")
         valid = isinstance(runtime, dict) and isinstance(modules, dict) and isinstance(config.get("rag"), dict)
@@ -183,15 +188,45 @@ class Verifier:
                 self.regular_file(modules.get(key, ""), "assistant_config.modules." + key)
             self.regular_file("configs/manual-qa.json", "manual_config")
             self.regular_file("configs/voice-gateway.json", "voice_config")
-        self.check_submodule()
-        return config, embedding
+        if self.valid_runtime_contract(runtime_contract):
+            self.check_submodule(runtime_contract)
+        if not self.valid_rag_contract(rag_contract):
+            rag_contract = None
+        return config, embedding, runtime_contract, rag_contract
 
-    def check_submodule(self) -> None:
-        _, manifest = self.load_json("evidence/benchmarks/manifests/runtime.json", "runtime_manifest")
-        expected = (((manifest or {}).get("submodule") or {}).get("commit"))
-        if not isinstance(expected, str):
-            self.add("upstream.commit", False, UPSTREAM, "commit in runtime manifest", None, "missing expected commit")
-            return
+    def valid_runtime_contract(self, contract: dict[str, Any] | None) -> bool:
+        submodule = (contract or {}).get("submodule")
+        build = (contract or {}).get("upstream_build")
+        valid = (isinstance(submodule, dict) and submodule.get("path") == UPSTREAM and
+                 isinstance(submodule.get("commit"), str) and len(submodule["commit"]) == 40 and
+                 isinstance(build, dict) and isinstance(build.get("path"), str) and
+                 isinstance(build.get("build_inputs"), list) and len(build["build_inputs"]) == 4 and
+                 isinstance(build.get("assistant_tools"), list) and len(build["assistant_tools"]) == 2 and
+                 all(isinstance(item, str) for item in build["build_inputs"] + build["assistant_tools"]))
+        self.add("runtime_delivery_contract.contract", valid, RUNTIME_CONTRACT,
+                 "runtime delivery contract", "valid" if valid else None,
+                 "valid" if valid else "missing required runtime delivery fields")
+        return valid
+
+    def valid_rag_contract(self, contract: dict[str, Any] | None) -> bool:
+        database = (contract or {}).get("database")
+        metadata = (contract or {}).get("index_metadata")
+        sources = (contract or {}).get("sources")
+        required = {"algorithm_version", "embedding_fingerprint", "r2_2_index_fingerprint"}
+        valid_sources = (isinstance(sources, list) and len(sources) == 3 and
+                         all(isinstance(item, dict) and set(item) == {"source_path", "document_id", "revision", "content_sha256"}
+                             and all(isinstance(item[field], str) and item[field] for field in item)
+                             for item in sources))
+        valid = (isinstance(database, dict) and isinstance(database.get("path"), str) and
+                 isinstance(database.get("size_bytes"), int) and isinstance(metadata, dict) and
+                 set(metadata) == required and all(isinstance(metadata[key], str) and metadata[key] for key in required) and
+                 valid_sources)
+        self.add("rag_delivery_contract.contract", valid, RAG_CONTRACT, "R2.2 delivery contract",
+                 "valid" if valid else None, "valid" if valid else "missing required RAG delivery fields")
+        return valid
+
+    def check_submodule(self, contract: dict[str, Any]) -> None:
+        expected = contract["submodule"]["commit"]
         try:
             observed = self.git_runner(["git", "-C", str(self.root / UPSTREAM), "rev-parse", "HEAD"])
         except VcsUnavailable as error:
@@ -201,23 +236,29 @@ class Verifier:
         self.add("upstream.commit", observed == expected, UPSTREAM, expected, observed,
                  "commit matches" if observed == expected else "submodule commit mismatch")
 
-    def build_inputs(self) -> None:
-        bin_dir = pathlib.PurePosixPath(UPSTREAM) / "build-jetson-release/bin"
-        for name in ("libllama.so", "libmtmd.so", "libggml.so", "libggml-cuda.so"):
-            self.elf_aarch64(str(bin_dir / name), "upstream." + name)
+    def build_inputs(self, contract: dict[str, Any] | None) -> None:
+        if contract is None:
+            return
+        build = contract["upstream_build"]
+        for name in build["build_inputs"]:
+            self.elf_aarch64(str(pathlib.PurePosixPath(build["path"]) / name), "upstream." + pathlib.PurePosixPath(name).name)
 
-    def assistant(self, config: dict[str, Any], embedding: dict[str, Any] | None) -> None:
+    def assistant(self, config: dict[str, Any], embedding: dict[str, Any] | None,
+                  runtime_contract: dict[str, Any] | None, rag_contract: dict[str, Any] | None) -> None:
         runtime = config.get("runtime", {})
         self.elf_aarch64(runtime.get("executable", ""), "runtime_host")
         self.asset(runtime.get("model", {}), "vlm_model")
         self.asset(runtime.get("mmproj", {}), "vlm_mmproj")
-        self.elf_aarch64(f"{UPSTREAM}/build-jetson-release/bin/llama-embedding", "upstream.llama_embedding")
-        self.elf_aarch64(f"{UPSTREAM}/build-jetson-release/bin/llama-tokenize", "upstream.llama_tokenize")
+        if runtime_contract is not None:
+            build = runtime_contract["upstream_build"]
+            for name in build["assistant_tools"]:
+                self.elf_aarch64(str(pathlib.PurePosixPath(build["path"]) / name),
+                                 "upstream." + pathlib.PurePosixPath(name).name.replace("-", "_"))
         if embedding is not None:
             self.embedding_asset(embedding.get("embedding", {}))
             self.check_knowledge(embedding)
         rag_path = ((config.get("rag") or {}).get("database"))
-        self.check_rag(rag_path, embedding)
+        self.check_rag(rag_path, embedding, rag_contract)
 
     def check_knowledge(self, embedding: dict[str, Any]) -> None:
         for index, source in enumerate(embedding.get("sources", [])):
@@ -236,37 +277,55 @@ class Verifier:
                 self.add(identifier + ".sha256", actual == expected, source["source_path"], expected, actual,
                          "source hash matches" if actual == expected else "source hash mismatch")
 
-    def check_rag(self, value: Any, embedding: dict[str, Any] | None) -> None:
+    def check_rag(self, value: Any, embedding: dict[str, Any] | None, contract: dict[str, Any] | None) -> None:
         if not isinstance(value, str):
             self.add("rag.database", False, None, "repository-relative SQLite path", value, "invalid database path")
             return
         path = self.regular_file(value, "rag.database")
-        if embedding is not None:
-            expected_path = embedding.get("generated_database")
-            self.add("rag.config_binding", value == expected_path, value, expected_path, value,
-                     "assistant and embedding configs agree" if value == expected_path else "RAG paths differ")
+        if embedding is not None and contract is not None:
+            expected_paths = [embedding.get("generated_database"), contract["database"]["path"]]
+            self.add("rag.config_binding", value == expected_paths[0] == expected_paths[1], value, expected_paths, value,
+                     "assistant, embedding, and delivery contract agree" if value == expected_paths[0] == expected_paths[1]
+                     else "RAG paths differ")
         if path is None:
             return
-        _, manifest = self.load_json("evidence/milestones/evaluation/rag-hybrid-m9.1b-r2.2-index-manifest.json", "rag_manifest")
-        if manifest is not None:
-            expected_size = manifest.get("database_size_bytes")
+        if contract is not None:
+            expected_size = contract["database"]["size_bytes"]
             self.add("rag.size", path.stat().st_size == expected_size, value, expected_size, path.stat().st_size,
-                     "size matches manifest" if path.stat().st_size == expected_size else "size differs from manifest")
-            manifest_sources = {
-                (item.get("source_path"), item.get("content_sha256"))
-                for item in manifest.get("documents", []) if isinstance(item, dict)
+                     "size matches delivery contract" if path.stat().st_size == expected_size else "size differs from delivery contract")
+            contract_sources = {
+                (item["source_path"], item["document_id"], item["revision"], item["content_sha256"])
+                for item in contract["sources"]
             }
             config_sources = {
-                (item.get("source_path"), item.get("content_sha256"))
+                (item.get("source_path"), item.get("document_id"), item.get("revision"), item.get("content_sha256"))
                 for item in (embedding or {}).get("sources", []) if isinstance(item, dict)
             }
-            self.add("rag.source_binding", manifest_sources == config_sources, value, sorted(manifest_sources),
-                     sorted(config_sources), "RAG manifest and embedding sources agree" if manifest_sources == config_sources
-                     else "RAG manifest and embedding sources differ")
+            self.add("rag.source_binding", contract_sources == config_sources, value, sorted(contract_sources),
+                     sorted(config_sources), "delivery contract and embedding sources agree" if contract_sources == config_sources
+                     else "delivery contract and embedding sources differ")
         try:
             connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
             try:
                 connection.execute("PRAGMA schema_version").fetchone()
+                if contract is not None:
+                    documents = set(connection.execute(
+                        "SELECT source_path, document_id, revision, content_sha256 FROM documents").fetchall())
+                    expected_documents = {
+                        (item["source_path"], item["document_id"], item["revision"], item["content_sha256"])
+                        for item in contract["sources"]
+                    }
+                    self.add("rag.documents_binding", documents == expected_documents, value, sorted(expected_documents),
+                             sorted(documents), "SQLite documents match delivery contract" if documents == expected_documents
+                             else "SQLite documents differ from delivery contract")
+                    metadata = dict(connection.execute(
+                        "SELECT key, value FROM index_metadata WHERE key IN (?, ?, ?)",
+                        ("algorithm_version", "embedding_fingerprint", "r2_2_index_fingerprint")).fetchall())
+                    for key, expected in contract["index_metadata"].items():
+                        observed = metadata.get(key)
+                        self.add("rag.metadata." + key, observed == expected, value, expected, observed,
+                                 "SQLite metadata matches delivery contract" if observed == expected
+                                 else "SQLite metadata differs from delivery contract")
             finally:
                 connection.close()
             self.add("rag.readonly", True, value, "read-only SQLite open", "opened", "opened read-only")
@@ -281,11 +340,11 @@ class Verifier:
             self.asset(voice.get(name, {}), "voice." + name)
 
     def run(self, profile: str) -> tuple[int, list[Check]]:
-        config, embedding = self.contract()
+        config, embedding, runtime_contract, rag_contract = self.contract()
         if profile in {"build-inputs", "assistant", "voice"}:
-            self.build_inputs()
+            self.build_inputs(runtime_contract)
         if profile in {"assistant", "voice"} and config is not None:
-            self.assistant(config, embedding)
+            self.assistant(config, embedding, runtime_contract, rag_contract)
         if profile == "voice":
             self.voice()
         if self.vcs_unavailable:

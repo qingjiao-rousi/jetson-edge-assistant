@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "submodule": {
+    "path": "third_party/llama.cpp-omni",
+    "commit": "19cc26967140407efe34006a355ab445b35b16ac"
+  },
+  "upstream_build": {
+    "path": "third_party/llama.cpp-omni/build-jetson-release",
+    "build_inputs": [
+      "bin/libllama.so",
+      "bin/libmtmd.so",
+      "bin/libggml.so",
+      "bin/libggml-cuda.so"
+    ],
+    "assistant_tools": [
+      "bin/llama-embedding",
+      "bin/llama-tokenize"
+    ]
+  }
+}
