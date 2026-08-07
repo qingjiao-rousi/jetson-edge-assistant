@@ -261,11 +261,44 @@ def run_agent(query: str, session_id: str, tools: ReadOnlyTools, retrieve: Calla
     return {"schema_version": 1, "milestone": MILESTONE, "status": "OK", "session_id": session_id, "answer": answer, "citations": citations, "plan": steps, "tool_audit": tools.audit[-len(steps):], "session_turns": len(sessions.get(session_id).turns), "retry_count": retry_count, "citation_failure_reason": None}
 
 
-class JsonlAgent:
-    """Long-lived JSONL facade; all state is deliberately process-local."""
+def build_application(config: dict, retrieval_config: dict, provider: Any,
+                      tools: ReadOnlyTools | None = None, sessions: SessionStore | None = None) -> "AgentApplication":
+    """Assemble the existing M9.2 RAG and local Runtime HTTP call once per process."""
+    from app.qa import manual_qa as m92
 
-    def __init__(self, tools: ReadOnlyTools, sessions: SessionStore, retrieve: Callable[[str], dict], generate: Callable[[str, list[dict]], str], tool_version: str = "m10.2-readonly-tools-v1"):
+    def retrieve(query: str) -> dict:
+        return m92.query_index(m92.repo_path(config["database"]), query,
+                               retrieval_config["retrieval"]["top_k"], provider,
+                               retrieval_config["retrieval"])
+
+    def generate_manual(prompt: str, citations: list[dict]) -> str:
+        body, _ = m92.call_model(config["model_endpoint"], f"agent-m10.2-{time.time_ns()}", prompt,
+                                 config["max_new_tokens"], config["timeout_seconds"],
+                                 system_prompt=m92.MANUAL_GROUNDED_SYSTEM_PROMPT)
+        if body is None:
+            raise ToolContractError("model generation failed")
+        return body["text"]
+
+    def generate_general(prompt: str, citations: list[dict]) -> str:
+        body, _ = m92.call_model(config["model_endpoint"], f"agent-m10.2-{time.time_ns()}", prompt,
+                                 config["max_new_tokens"], config["timeout_seconds"],
+                                 system_prompt=m92.GENERAL_EXPLANATION_SYSTEM_PROMPT)
+        if body is None:
+            raise ToolContractError("model generation failed")
+        return body["text"]
+
+    return AgentApplication(tools or ReadOnlyTools(), sessions or SessionStore(), retrieve, generate_manual,
+                            generate_general)
+
+
+class AgentApplication:
+    """Process-local Agent core shared by JSONL, terminal, and audio adapters."""
+
+    def __init__(self, tools: ReadOnlyTools, sessions: SessionStore, retrieve: Callable[[str], dict],
+                 generate: Callable[[str, list[dict]], str], explain_generate: Callable[[str, list[dict]], str] | None = None,
+                 tool_version: str = "m10.2-readonly-tools-v1"):
         self.tools, self.sessions, self.retrieve, self.generate = tools, sessions, retrieve, generate
+        self.explain_generate = explain_generate or generate
         self.tool_version = tool_version
         self.request_ids: set[str] = set()
 
@@ -302,7 +335,7 @@ class JsonlAgent:
             else:
                 query = self._required_string(request.get("query"), "query", 4096)
                 if op == "explain":
-                    result = run_explain(query, session_id, self.generate, self.sessions)
+                    result = run_explain(query, session_id, self.explain_generate, self.sessions)
                 else:
                     plan_value = plan(query)
                     result = run_agent(query, session_id, self.tools, self.retrieve, self.generate, self.sessions)
@@ -313,6 +346,26 @@ class JsonlAgent:
             response = {**base, "status": "ERROR", "error": str(error), "session_turns": turns}
         response.update({"request_id": request_id, "session_id": session_id, "op": op, "plan": plan_value, "tool_audit": audit, "session_turns": turns, "status": response.get("status", status), "elapsed_ms": round((time.monotonic() - started) * 1000)})
         return response
+
+
+class JsonlAgent:
+    """Long-lived JSONL facade over :class:`AgentApplication`."""
+
+    def __init__(self, tools: ReadOnlyTools | None = None, sessions: SessionStore | None = None,
+                 retrieve: Callable[[str], dict] | None = None,
+                 generate: Callable[[str, list[dict]], str] | None = None,
+                 tool_version: str = "m10.2-readonly-tools-v1", application: AgentApplication | None = None,
+                 explain_generate: Callable[[str, list[dict]], str] | None = None):
+        if application is None:
+            if tools is None or sessions is None or retrieve is None or generate is None:
+                raise ToolContractError("tools, sessions, retrieve and generate are required")
+            application = AgentApplication(tools, sessions, retrieve, generate, explain_generate, tool_version)
+        self.application = application
+        # Public aliases preserve compatibility with existing callers and tests.
+        self.tools, self.sessions = application.tools, application.sessions
+
+    def handle(self, request: dict) -> dict:
+        return self.application.handle(request)
 
     def serve(self, stream_in, stream_out) -> None:
         for line in stream_in:
@@ -332,25 +385,18 @@ def main() -> int:
     parser.add_argument("--query")
     parser.add_argument("--session-id")
     parser.add_argument("--jsonl", action="store_true", help="serve one JSON response per JSONL request")
-    parser.add_argument("--config", default="configs/manual-qa.json")
+    parser.add_argument("--config", default="configs/assistant.json", help="top-level assistant config")
     parser.add_argument("--request-id")
     args = parser.parse_args()
     try:
+        from app.assistant.application import load_config as load_assistant_config
         from app.qa import manual_qa as m92
-        config = m92.load_config(m92.repo_path(args.config))
+        config = load_assistant_config(args.config)["_manual"]
         retrieval_config = json.loads(m92.repo_path(config["retrieval_config"]).read_text(encoding="utf-8"))
         embedding_config = m92.load_embedding_config(m92.repo_path(config["embedding_config"]))
         provider = m92.provider_from_config(embedding_config)
-        tools = ReadOnlyTools()
-        sessions = SessionStore()
-        def retrieve(query: str) -> dict:
-            return m92.query_index(m92.repo_path(config["database"]), query, retrieval_config["retrieval"]["top_k"], provider, retrieval_config["retrieval"])
-        def generate(prompt: str, citations: list[dict]) -> str:
-            body, _ = m92.call_model(config["model_endpoint"], f"agent-m10.2-{time.time_ns()}", prompt, config["max_new_tokens"], config["timeout_seconds"])
-            if body is None:
-                raise ToolContractError("model generation failed")
-            return body["text"]
-        server = JsonlAgent(tools, sessions, retrieve, generate)
+        application = build_application(config, retrieval_config, provider)
+        server = JsonlAgent(application=application)
         if args.jsonl:
             server.serve(sys.stdin, sys.stdout)
             return 0

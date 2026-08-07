@@ -1,13 +1,15 @@
+import json
 import pathlib
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 from app.qa import manual_qa as M
+from app.assistant.application import load_config as load_assistant_config
 
 
 class RagVlmPrototypeTest(unittest.TestCase):
     def setUp(self):
-        self.config = M.load_config(ROOT / "configs" / "manual-qa.json")
+        self.config = load_assistant_config()["_manual"]
         self.retrieved = {"answerable": True, "admission": {"passed": True, "reasons": []}, "constraints": {}, "results": [{"chunk_id": "BX9-MANUAL-001#pressure", "heading": "Outlet Pressure", "text": "Normal outlet pressure is 2 MPa.", "citation": {"document_id": "BX9-MANUAL-001", "source_path": "knowledge/manuals/bx9-hydraulic-pump-manual.md"}}]}
 
     def test_prompt_and_response_keep_retrieval_citations(self):
@@ -41,6 +43,22 @@ class RagVlmPrototypeTest(unittest.TestCase):
         with mock.patch("urllib.request.urlopen", return_value=Response()):
             response, metadata = M.call_model("http://test/v1/chat", "x", "prompt", 10, 1)
         self.assertIsNone(response); self.assertEqual(metadata["error"], "invalid_model_response")
+
+    def test_call_model_accepts_an_explicit_system_prompt(self):
+        captured = {}
+        class Response:
+            status = 200
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def read(self): return b'{"text":"ok"}'
+        def urlopen(request, **_kwargs):
+            captured.update(json.loads(request.data.decode("utf-8")))
+            return Response()
+        from unittest import mock
+        with mock.patch("urllib.request.urlopen", side_effect=urlopen):
+            response, _ = M.call_model("http://test/v1/chat", "x", "prompt", 10, 1, system_prompt="general system")
+        self.assertEqual(response["text"], "ok")
+        self.assertEqual(captured["messages"][0], {"role": "system", "content": "general system"})
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ from typing import Any
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MILESTONE = "M11-PROTOTYPE"
 CITATION_MARKER = re.compile(r"\s*\[S[1-9][0-9]*\]\s*")
+SPEECH_SENTENCE = re.compile(r"[^。！？!?；;]+[。！？!?；;]?")
 
 
 class AudioGatewayError(ValueError):
@@ -61,8 +62,27 @@ def normalize_spoken_text(answer: str) -> str:
     spoken = re.sub(r"\bE(\d{2,4})\b", lambda m: "故障代码" + _spoken_number(m.group(1)), spoken, flags=re.IGNORECASE)
     # Do not invent a pronunciation for unsupported ASCII identifiers.
     spoken = re.sub(r"[A-Za-z][A-Za-z0-9._/-]*", "", spoken)
+    # VITS lexicons do not assign pronunciations to bracket glyphs; they add no spoken meaning.
+    spoken = re.sub(r"[()（）\[\]{}<>]", "", spoken)
     spoken = re.sub(r"\s+", "", spoken)
     return spoken
+
+
+def speech_chunks(text: str, maximum_characters: int = 48) -> list[str]:
+    """Split completed text for sequential TTS playback; this is not streaming TTS."""
+    if not isinstance(text, str) or maximum_characters < 1:
+        return []
+    chunks: list[str] = []
+    for sentence in SPEECH_SENTENCE.findall(text):
+        remaining = sentence.strip()
+        while len(remaining) > maximum_characters:
+            boundary = remaining.rfind("，", 0, maximum_characters + 1)
+            split_at = boundary + 1 if boundary >= 0 else maximum_characters
+            chunks.append(remaining[:split_at])
+            remaining = remaining[split_at:]
+        if remaining:
+            chunks.append(remaining)
+    return chunks
 
 
 def tts_text(answer: str) -> str:
@@ -112,13 +132,11 @@ def validate_model_spec(spec: dict, name: str, sample_rate: int) -> dict:
 def load_config(path: str | pathlib.Path) -> dict:
     config_path = _repo_file(str(path)) if not isinstance(path, pathlib.Path) or not path.is_absolute() else path
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    required = {"schema_version", "milestone", "sample_rate", "tts_sample_rate", "channels", "input_device", "output_device", "asr_model", "vad_model", "tts_model", "agent_command", "session_id", "max_record_seconds", "silence_timeout_seconds"}
+    required = {"schema_version", "milestone", "sample_rate", "tts_sample_rate", "channels", "input_device", "output_device", "asr_model", "vad_model", "tts_model", "session_id", "max_record_seconds", "silence_timeout_seconds"}
     if set(config) != required or config["schema_version"] != 1 or config["milestone"] != MILESTONE:
         raise AudioGatewayError("invalid M11 config")
     if config["sample_rate"] != 16000 or config["channels"] != 1:
         raise AudioGatewayError("M11 audio contract requires 16 kHz mono")
-    if not isinstance(config["agent_command"], list) or not config["agent_command"] or any(not isinstance(v, str) or not v for v in config["agent_command"]):
-        raise AudioGatewayError("agent_command must be a non-empty argv list")
     if not isinstance(config["session_id"], str) or not config["session_id"] or len(config["session_id"]) > 128:
         raise AudioGatewayError("invalid voice session_id")
     if config["tts_sample_rate"] != 8000:
@@ -157,6 +175,22 @@ class AgentClient:
         self.process.wait(timeout=5)
 
 
+class InProcessAgentClient:
+    """Adapter for the existing Agent application; no JSONL subprocess is started."""
+
+    def __init__(self, application: Any):
+        self.application = application
+
+    def answer(self, request_id: str, session_id: str, query: str) -> dict:
+        return self.application.handle({"request_id": request_id, "op": "answer", "session_id": session_id, "query": query})
+
+    def request(self, payload: dict) -> dict:
+        return self.application.handle(payload)
+
+    def close(self) -> None:
+        return None
+
+
 @dataclass
 class HalfDuplexGateway:
     config: dict
@@ -164,6 +198,7 @@ class HalfDuplexGateway:
     audio: Any
     asr: Any
     tts: Any
+    speak: bool = True
 
     def run_turn(self, request_id: str) -> dict:
         samples = self.audio.record(self.config["max_record_seconds"], self.config["silence_timeout_seconds"])
@@ -173,6 +208,8 @@ class HalfDuplexGateway:
         response = self.agent.answer(request_id, self.config["session_id"], text)
         if response.get("status") != "OK":
             return {"status": response.get("status", "AGENT_ERROR"), "text": text, "answer": response.get("answer"), "citations": response.get("citations", []), "spoken_text": None}
+        if not self.speak:
+            return {"status": "OK", "text": text, "answer": response["answer"], "citations": response.get("citations", []), "spoken_text": None}
         spoken = normalize_spoken_text(response["answer"])
         if not spoken:
             return {"status": "TTS_TEXT_ERROR", "text": text, "answer": response["answer"], "citations": response.get("citations", []), "spoken_text": ""}
@@ -237,8 +274,29 @@ def build_tts_backends(config: dict):
     return PlaybackAudio(), Tts(), sherpa_onnx, sd
 
 
-def build_backends(config: dict):
-    playback, tts_adapter, sherpa_onnx, sd = build_tts_backends(config)
+def check_output_device(config: dict) -> None:
+    try:
+        import sounddevice as sd
+        sd.query_devices(config["output_device"], kind="output")
+    except (ImportError, ValueError, OSError) as error:
+        raise AudioGatewayError(f"output device is unavailable: {error}") from error
+
+
+def check_input_device(config: dict) -> None:
+    try:
+        import sounddevice as sd
+        sd.query_devices(config["input_device"], kind="input")
+    except (ImportError, ValueError, OSError) as error:
+        raise AudioGatewayError(f"input device is unavailable: {error}") from error
+
+
+def build_asr_backends(config: dict):
+    try:
+        import sounddevice as sd
+        import sherpa_onnx
+    except ImportError as error:
+        raise AudioGatewayError("M11 requires local sounddevice/PortAudio and sherpa-onnx packages") from error
+
     class PortAudio:
         def record(self, max_seconds, silence_timeout):
             frames = []
@@ -258,9 +316,6 @@ def build_backends(config: dict):
                     except (AttributeError, TypeError):
                         pass
             return b"".join(frames)
-
-        def play(self, pcm, sample_rate):
-            playback.play(pcm, sample_rate)
 
     # Keep construction local and explicit; no model download or network fallback exists.
     try:
@@ -290,18 +345,34 @@ def build_backends(config: dict):
                 recognizer.decode_stream(stream)
             return recognizer.get_result_all(stream).text
 
-    return PortAudio(), VadAsr(), tts_adapter
+    return PortAudio(), VadAsr()
+
+
+def build_backends(config: dict):
+    recorder, asr = build_asr_backends(config)
+    playback, tts, _, _ = build_tts_backends(config)
+
+    class Audio:
+        def record(self, max_seconds, silence_timeout):
+            return recorder.record(max_seconds, silence_timeout)
+
+        def play(self, pcm, sample_rate):
+            playback.play(pcm, sample_rate)
+
+    return Audio(), asr, tts
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="configs/voice-gateway.json")
+    parser.add_argument("--assistant-config", default="configs/assistant.json", help="provides the canonical Agent command")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--text", help="run one keyboard text -> Agent -> TTS playback demo")
     args = parser.parse_args()
     try:
         config = load_config(args.config)
-        agent = AgentClient(config["agent_command"])
+        from app.assistant.application import load_config as load_assistant_config
+        agent = AgentClient(load_assistant_config(args.assistant_config)["agent_command"])
         try:
             if args.text is not None:
                 audio, tts, _, _ = build_tts_backends(config)

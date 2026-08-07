@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-from app.audio.voice_gateway import AudioGatewayError, HalfDuplexGateway, TextDemoGateway, float_samples_to_pcm, load_config, normalize_spoken_text, tts_text
+from app.audio.voice_gateway import AudioGatewayError, HalfDuplexGateway, TextDemoGateway, float_samples_to_pcm, load_config, normalize_spoken_text, speech_chunks, tts_text
 
 
 class AudioGatewayM11Test(unittest.TestCase):
@@ -18,7 +18,7 @@ class AudioGatewayM11Test(unittest.TestCase):
     def test_config_requires_pinned_local_artifacts(self):
         with tempfile.TemporaryDirectory(dir=ROOT) as temp:
             directory = pathlib.Path(temp)
-            config = {"schema_version": 1, "milestone": "M11-PROTOTYPE", "sample_rate": 16000, "tts_sample_rate": 8000, "channels": 1, "input_device": None, "output_device": None, "asr_model": self.artifact(directory, "asr"), "vad_model": self.artifact(directory, "vad"), "tts_model": {**self.artifact(directory, "tts"), "sample_rate": 8000}, "agent_command": ["python3", "scripts/run_agent.py", "--jsonl"], "session_id": "voice-session", "max_record_seconds": 15, "silence_timeout_seconds": 2}
+            config = {"schema_version": 1, "milestone": "M11-PROTOTYPE", "sample_rate": 16000, "tts_sample_rate": 8000, "channels": 1, "input_device": None, "output_device": None, "asr_model": self.artifact(directory, "asr"), "vad_model": self.artifact(directory, "vad"), "tts_model": {**self.artifact(directory, "tts"), "sample_rate": 8000}, "session_id": "voice-session", "max_record_seconds": 15, "silence_timeout_seconds": 2}
             path = directory / "config.json"; path.write_text(json.dumps(config), encoding="utf-8")
             loaded = load_config(path)
             self.assertEqual(loaded["sample_rate"], 16000)
@@ -74,8 +74,14 @@ class AudioGatewayM11Test(unittest.TestCase):
         self.assertEqual(tts_text("答案。[S1] [S2]"), "答案。")
         self.assertEqual(float_samples_to_pcm([-1.0, 0.0, 1.0]), b"\x00\x80\x00\x00\xff\x7f")
 
+    def test_speech_chunks_preserve_sentence_order_and_bound_size(self):
+        text = "第一句。第二句，包含一个较长的分句，仍应按顺序播放。"
+        chunks = speech_chunks(text, maximum_characters=10)
+        self.assertEqual("".join(chunks), text)
+        self.assertTrue(all(len(chunk) <= 10 for chunk in chunks))
+
     def test_spoken_text_normalizes_citations_codes_numbers_and_units(self):
-        answer = "BX-9 的出口压力是 18 MPa。[S1] E42，15 to 65 degrees Celsius，250 operating hours。[S12]"
+        answer = "BX-9 的出口压力是 18 MPa。[S1]（E42），15 to 65 degrees Celsius，250 operating hours。[S12]"
         self.assertEqual(normalize_spoken_text(answer), "该设备的出口压力是十八兆帕。故障代码四十二，十五到六十五摄氏度，二百五十运行小时。")
         self.assertNotIn("[S", normalize_spoken_text(answer))
 

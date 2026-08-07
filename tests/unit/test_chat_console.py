@@ -51,8 +51,10 @@ class ChatConsoleM12Test(unittest.TestCase):
         request = self.requests(holder["process"])[0]
         self.assertEqual((request["op"], request["session_id"], request["query"]), ("answer", "session-fixed", "设备压力是多少？"))
         shown = output.getvalue()
+        self.assertIn("EdgeOmni [manual] > ", shown)
         self.assertIn("[S1]", shown)
-        self.assertIn("助手：回答结束。", shown)
+        self.assertIn("─" * 40, shown)
+        self.assertNotIn("助手：", shown)
         self.assertNotIn("tool_audit", shown)
         self.assertNotIn('"request_id"', shown)
 
@@ -62,8 +64,9 @@ class ChatConsoleM12Test(unittest.TestCase):
             ["/mode general", "什么是空化？", "/quit"])
         console.run()
         self.assertEqual(self.requests(holder["process"])[0]["op"], "explain")
-        self.assertEqual(output.getvalue().count("非设备手册结论"), 1)
+        self.assertEqual(output.getvalue().count("不构成设备手册结论"), 1)
         self.assertNotIn("citations", output.getvalue())
+        self.assertIn("EdgeOmni [general] > ", output.getvalue())
 
     def test_reset_uses_same_session_and_non_ok_is_friendly(self):
         console, holder, output = self.make_console(
@@ -82,6 +85,46 @@ class ChatConsoleM12Test(unittest.TestCase):
         self.assertEqual(holder["process"].stdin.getvalue(), "")
         self.assertTrue(holder["process"].terminated)
         self.assertTrue(holder["process"].waited)
+
+    def test_tts_failure_keeps_text_session_running_and_disables_tts(self):
+        responses = [{"status": "OK", "answer": "first [S1]"}, {"status": "OK", "answer": "second [S1]"}]
+        console, holder, output = self.make_console(responses, ["one", "two", "/quit"])
+        console.speaker = lambda _: (_ for _ in ()).throw(RuntimeError("TTS unavailable"))
+        console.speak = True
+        console.run()
+        self.assertFalse(console.speak)
+        self.assertEqual([request["query"] for request in self.requests(holder["process"])], ["one", "two"])
+        self.assertEqual(output.getvalue().count("语音输出不可用，已继续文本对话。"), 1)
+
+    def test_image_command_uses_shlex_path_and_shows_unfused_diagnosis(self):
+        calls = []
+        class Agent:
+            def close(self): pass
+        def diagnose(path, prompt, request_id):
+            calls.append((path, prompt, request_id))
+            return {"text": "面板显示告警。"}
+        output = io.StringIO()
+        console = ChatConsole(Agent(), io.StringIO('/image "tests/fixtures/vlm-service/synthetic-alarm-panel.png" 检查 告警\n/quit\n'), output,
+                              request_id_factory=iter(["image-request"]).__next__, image_diagnoser=diagnose)
+        console.run()
+        self.assertEqual(calls, [("tests/fixtures/vlm-service/synthetic-alarm-panel.png", "检查 告警", "image-request")])
+        self.assertIn("图像诊断，未经过 RAG 检索或引用校验", output.getvalue())
+        self.assertIn("面板显示告警", output.getvalue())
+
+    def test_image_command_uses_default_prompt_and_reports_usage_or_callback_errors(self):
+        calls = []
+        class Agent:
+            def close(self): pass
+        def diagnose(path, prompt, request_id):
+            calls.append((path, prompt, request_id))
+            raise RuntimeError("图片读取失败")
+        output = io.StringIO()
+        console = ChatConsole(Agent(), io.StringIO('/image tests/fixtures/vlm-service/synthetic-device-panel.png\n/image\n/quit\n'), output,
+                              request_id_factory=iter(["image-request"]).__next__, image_diagnoser=diagnose)
+        console.run()
+        self.assertEqual(calls[0], ("tests/fixtures/vlm-service/synthetic-device-panel.png", None, "image-request"))
+        self.assertIn("图像诊断失败：图片读取失败", output.getvalue())
+        self.assertIn("用法：/image <仓库内相对图片路径> [可选问题]", output.getvalue())
 
 
 if __name__ == "__main__":

@@ -17,11 +17,18 @@ from app.retrieval.embedding import load_config as load_embedding_config
 from app.retrieval.engine import query_index
 
 MILESTONE = "M9.2-PROTOTYPE"
-SYSTEM_PROMPT = (
+MANUAL_GROUNDED_SYSTEM_PROMPT = (
     "You are an industrial equipment manual assistant. Answer only from the supplied manual "
     "evidence. Do not invent limits, procedures, causes, or facts. If the evidence is insufficient, "
     "say that the supplied manual evidence is insufficient. Cite every factual statement with one or "
     "more evidence markers such as [S1]. Reply in the user's language when practical."
+)
+# Compatibility name for callers that imported the original prompt constant.
+SYSTEM_PROMPT = MANUAL_GROUNDED_SYSTEM_PROMPT
+GENERAL_EXPLANATION_SYSTEM_PROMPT = (
+    "你是一般知识解释助手。只做一般知识解释，不假设设备型号、现场参数或工况。"
+    "不要输出 [S1] 或其他 citation 标记。不要提供维修步骤、带压操作、旁路或复位安全联锁、"
+    "绕过保护、危险化学品处置等安全关键指令。遇到危险或设备特定问题时，建议查阅受控资料并由合格人员确认。"
 )
 
 
@@ -34,18 +41,26 @@ def repo_path(value: str) -> pathlib.Path:
 
 def load_config(path: pathlib.Path) -> dict:
     config = json.loads(path.read_text(encoding="utf-8"))
-    required = {"schema_version", "milestone", "retrieval_config", "embedding_config", "database", "model_endpoint", "max_new_tokens", "timeout_seconds"}
-    if set(config) != required or config["schema_version"] != 1 or config["milestone"] != MILESTONE:
+    required = {"schema_version", "milestone", "retrieval_config", "embedding_config", "max_new_tokens", "timeout_seconds"}
+    if set(config) != required or config["schema_version"] != 2 or config["milestone"] != MILESTONE:
         raise ContractError("invalid M9.2 config")
-    if not all(isinstance(config[key], str) and config[key] for key in ("retrieval_config", "embedding_config", "database", "model_endpoint")):
-        raise ContractError("invalid M9.2 paths or endpoint")
-    if not config["model_endpoint"].startswith(("http://", "https://")):
-        raise ContractError("M9.2 model_endpoint must be HTTP(S)")
+    if not all(isinstance(config[key], str) and config[key] for key in ("retrieval_config", "embedding_config")):
+        raise ContractError("invalid M9.2 module paths")
     if not isinstance(config["max_new_tokens"], int) or config["max_new_tokens"] < 1:
         raise ContractError("invalid M9.2 max_new_tokens")
     if not isinstance(config["timeout_seconds"], int) or config["timeout_seconds"] < 1:
         raise ContractError("invalid M9.2 timeout_seconds")
     return config
+
+
+def bind_runtime(config: dict, database: str, model_endpoint: str) -> dict:
+    """Bind shared top-level assets without duplicating them in this module config."""
+    if not isinstance(database, str) or not database:
+        raise ContractError("M9.2 database must be a repository-relative path")
+    repo_path(database)
+    if not isinstance(model_endpoint, str) or not model_endpoint.startswith(("http://", "https://")):
+        raise ContractError("M9.2 model endpoint must be HTTP(S)")
+    return {**config, "database": database, "model_endpoint": model_endpoint}
 
 
 def citation_id(index: int) -> str:
@@ -67,8 +82,12 @@ def cited_results(results: list[dict]) -> list[dict]:
     return [{"id": citation_id(index), "chunk_id": item["chunk_id"], "citation": item["citation"]} for index, item in enumerate(results, 1)]
 
 
-def call_model(endpoint: str, request_id: str, prompt: str, max_new_tokens: int, timeout_seconds: int) -> tuple[dict | None, dict]:
-    payload = {"request_id": request_id, "session_id": None, "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}], "max_new_tokens": max_new_tokens, "stream": False}
+def call_model(endpoint: str, request_id: str, prompt: str, max_new_tokens: int, timeout_seconds: int,
+               system_prompt: str = MANUAL_GROUNDED_SYSTEM_PROMPT) -> tuple[dict | None, dict]:
+    """Call the local Runtime, retaining the manual-grounded prompt as the default."""
+    if not isinstance(system_prompt, str) or not system_prompt.strip():
+        raise ContractError("system_prompt must be a non-empty string")
+    payload = {"request_id": request_id, "session_id": None, "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}], "max_new_tokens": max_new_tokens, "stream": False}
     request = urllib.request.Request(endpoint, data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST")
     metadata = {"endpoint": endpoint, "request_id": request_id, "http_status": None}
     try:
@@ -95,6 +114,8 @@ def call_model(endpoint: str, request_id: str, prompt: str, max_new_tokens: int,
 def answer_query(query: str, config: dict, request_id: str | None = None, provider=None, retrieval_fn=query_index, model_call=call_model) -> dict:
     if not isinstance(query, str) or not query.strip():
         raise ContractError("query must be non-empty")
+    if "database" not in config or "model_endpoint" not in config:
+        raise ContractError("M9.2 requires shared Runtime and RAG bindings from configs/assistant.json")
     retrieval_config = json.loads(repo_path(config["retrieval_config"]).read_text(encoding="utf-8"))
     embedding_config = load_embedding_config(repo_path(config["embedding_config"]))
     provider = provider or provider_from_config(embedding_config)
@@ -113,11 +134,13 @@ def answer_query(query: str, config: dict, request_id: str | None = None, provid
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--query", required=True)
-    parser.add_argument("--config", default="configs/manual-qa.json")
+    parser.add_argument("--config", default="configs/assistant.json", help="top-level assistant config")
     parser.add_argument("--request-id")
     args = parser.parse_args()
     try:
-        result = answer_query(args.query, load_config(repo_path(args.config)), args.request_id)
+        from app.assistant.application import load_config as load_assistant_config
+        assistant_config = load_assistant_config(args.config)
+        result = answer_query(args.query, assistant_config["_manual"], args.request_id)
     except (ContractError, OSError, json.JSONDecodeError) as error:
         print(json.dumps({"status": "ERROR", "error": str(error)}, ensure_ascii=False))
         return 2

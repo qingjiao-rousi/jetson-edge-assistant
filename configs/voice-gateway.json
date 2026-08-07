@@ -30,7 +30,6 @@
     "sample_rate": 8000,
     "license": "Apache-2.0"
   },
-  "agent_command": ["python3", "scripts/run_agent.py", "--jsonl"],
   "session_id": "voice-session-001",
   "max_record_seconds": 15,
   "silence_timeout_seconds": 2

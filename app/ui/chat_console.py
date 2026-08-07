@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import shlex
 import subprocess
 import sys
 import time
@@ -13,6 +14,7 @@ from typing import Any, Callable, TextIO
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 AGENT_COMMAND = ["python3", "scripts/run_agent.py", "--jsonl"]
+DIVIDER = "─" * 40
 
 
 class ConsoleError(RuntimeError):
@@ -73,24 +75,49 @@ def _friendly_response(response: dict, mode: str) -> str:
 
 
 class ChatConsole:
-    def __init__(self, agent: AgentProcess, input_stream: TextIO = sys.stdin, output_stream: TextIO = sys.stdout,
-                 session_id: str | None = None, request_id_factory: Callable[[], str] | None = None):
+    def __init__(self, agent: Any, input_stream: TextIO = sys.stdin, output_stream: TextIO = sys.stdout,
+                 session_id: str | None = None, request_id_factory: Callable[[], str] | None = None,
+                 speaker: Callable[[str], None] | None = None, listener: Callable[[str], dict] | None = None,
+                 speak: bool = False, image_diagnoser: Callable[[str, str | None, str], dict] | None = None):
         self.agent = agent
         self.input_stream = input_stream
         self.output_stream = output_stream
         self.session_id = session_id or f"m12-console-{uuid.uuid4().hex}"
         self.request_id_factory = request_id_factory or (lambda: f"m12-{time.time_ns()}-{uuid.uuid4().hex[:8]}")
         self.mode = "manual"
+        self.speaker, self.listener, self.speak, self.image_diagnoser = speaker, listener, speak, image_diagnoser
 
     def _write(self, text: str) -> None:
         self.output_stream.write(text + "\n")
         self.output_stream.flush()
+
+    def _prompt(self) -> None:
+        label = "manual" if self.mode == "manual" else "general"
+        self.output_stream.write(f"EdgeOmni [{label}] > ")
+        self.output_stream.flush()
+
+    def _result(self, text: str) -> None:
+        self._write("")
+        self._write(text)
+        self._write("")
+        self._write(DIVIDER)
 
     def _request(self, op: str, query: str | None = None) -> dict:
         payload = {"request_id": self.request_id_factory(), "op": op, "session_id": self.session_id}
         if query is not None:
             payload["query"] = query
         return self.agent.request(payload)
+
+    def _show_response(self, response: dict) -> None:
+        answer = _friendly_response(response, self.mode)
+        self._result(answer)
+        if response.get("status") == "OK":
+            if self.speak and self.speaker is not None:
+                try:
+                    self.speaker(answer)
+                except (OSError, RuntimeError, ValueError):
+                    self.speak = False
+                    self._result("语音输出不可用，已继续文本对话。")
 
     def handle_line(self, line: str) -> bool:
         text = line.strip()
@@ -100,33 +127,73 @@ class ChatConsole:
             return False
         if text == "/reset":
             response = self._request("reset")
-            self._write("助手：会话已重置。" if response.get("status") == "OK" else "助手：会话重置失败。")
+            self._result("会话已重置。" if response.get("status") == "OK" else "会话重置失败。")
+            return True
+        if text == "/image" or text.startswith("/image "):
+            try:
+                parts = shlex.split(text)
+            except ValueError as error:
+                self._result(f"图像诊断命令格式错误：{error}")
+                return True
+            if len(parts) < 2 or self.image_diagnoser is None:
+                self._result("用法：/image <仓库内相对图片路径> [可选问题]。")
+                return True
+            image_path = parts[1]
+            prompt = " ".join(parts[2:]) or None
+            try:
+                response = self.image_diagnoser(image_path, prompt, self.request_id_factory())
+                self._result("图像诊断，未经过 RAG 检索或引用校验。\n" + response["text"])
+            except (OSError, RuntimeError, ValueError) as error:
+                self._result(f"图像诊断失败：{error}")
             return True
         if text.startswith("/mode "):
             requested = text[6:].strip().lower()
             if requested not in {"manual", "general"}:
-                self._write("助手：用法：/mode manual 或 /mode general。")
+                self._result("用法：/mode manual 或 /mode general。")
             else:
                 self.mode = requested
                 if requested == "general":
-                    self._write("助手：已切换到通用解释模式（非设备手册结论）。")
+                    self._result("已切换到通用解释模式。内容不构成设备手册结论。")
                 else:
-                    self._write("助手：已切换到手册模式。")
+                    self._result("已切换到手册模式。")
+            return True
+        if text.startswith("/speak "):
+            requested = text[7:].strip().lower()
+            if requested not in {"on", "off"}:
+                self._result("用法：/speak on 或 /speak off。")
+            elif requested == "on" and self.speaker is None:
+                self._result("语音输出不可用。")
+            else:
+                self.speak = requested == "on"
+                self._result("语音输出已开启。" if self.speak else "语音输出已关闭。")
+            return True
+        if text == "/listen":
+            if self.listener is None:
+                self._result("语音输入不可用。")
+                return True
+            try:
+                result = self.listener(self.request_id_factory())
+                heard = result.get("text", "")
+                if heard:
+                    self._write("你：" + heard)
+                self._show_response(result)
+            except (OSError, RuntimeError, ValueError) as error:
+                self._result(f"语音输入失败：{error}")
             return True
         if text.startswith("/"):
-            self._write("助手：未知命令。可用：/mode manual、/mode general、/reset、/quit。")
+            self._result("未知命令。可用：/mode manual、/mode general、/speak on、/speak off、/listen、/image <图片路径> [问题]、/reset、/quit。")
             return True
-        self._write(f"你：{text}")
         response = self._request("answer" if self.mode == "manual" else "explain", text)
-        self._write("助手：" + _friendly_response(response, self.mode))
-        if response.get("status") == "OK":
-            self._write("助手：回答结束。")
+        self._show_response(response)
         return True
 
     def run(self) -> None:
         try:
-            self._write("助手：M12 终端已启动（手册模式）。请输入问题，或使用 /mode、/reset、/quit。")
-            for line in self.input_stream:
+            while True:
+                self._prompt()
+                line = self.input_stream.readline()
+                if not line:
+                    break
                 if not self.handle_line(line):
                     break
         finally:
