@@ -1,6 +1,8 @@
-set(EDGEOMNI_LLAMA_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llama.cpp-omni/build-jetson-release" CACHE PATH
+set(EDGEOMNI_LLAMA_UPSTREAM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llama.cpp-omni")
+
+set(EDGEOMNI_LLAMA_BUILD_DIR "${EDGEOMNI_LLAMA_UPSTREAM_DIR}/build-jetson-release" CACHE PATH
     "Existing frozen llama.cpp build directory")
-set(EDGEOMNI_LLAMA_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llama.cpp-omni/include" CACHE PATH
+set(EDGEOMNI_LLAMA_INCLUDE_DIR "${EDGEOMNI_LLAMA_UPSTREAM_DIR}/include" CACHE PATH
     "Frozen llama.cpp public include directory")
 
 find_library(EDGEOMNI_LLAMA_LIBRARY NAMES llama libllama.so
@@ -15,12 +17,12 @@ add_library(edgeomni_llama SHARED IMPORTED GLOBAL)
 set_target_properties(edgeomni_llama PROPERTIES
     IMPORTED_LOCATION "${EDGEOMNI_LLAMA_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES
-        "${EDGEOMNI_LLAMA_INCLUDE_DIR};${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llama.cpp-omni/ggml/include")
+        "${EDGEOMNI_LLAMA_INCLUDE_DIR};${EDGEOMNI_LLAMA_UPSTREAM_DIR}/ggml/include")
 add_library(edgeomni_mtmd SHARED IMPORTED GLOBAL)
 set_target_properties(edgeomni_mtmd PROPERTIES
     IMPORTED_LOCATION "${EDGEOMNI_MTMD_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES
-        "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llama.cpp-omni/tools/mtmd;${EDGEOMNI_LLAMA_INCLUDE_DIR};${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llama.cpp-omni/ggml/include")
+        "${EDGEOMNI_LLAMA_UPSTREAM_DIR}/tools/mtmd;${EDGEOMNI_LLAMA_INCLUDE_DIR};${EDGEOMNI_LLAMA_UPSTREAM_DIR}/ggml/include")
 
 message(STATUS "EdgeOmni frozen llama include: ${EDGEOMNI_LLAMA_INCLUDE_DIR}")
 message(STATUS "EdgeOmni frozen llama library: ${EDGEOMNI_LLAMA_LIBRARY}")
@@ -43,23 +45,23 @@ target_include_directories(edgeomni_fake_backend PUBLIC include)
 
 find_package(Threads REQUIRED)
 add_library(edgeomni_cpp_httplib STATIC
-    ../third_party/llama.cpp-omni/vendor/cpp-httplib/httplib_stub.cpp)
+    "${EDGEOMNI_LLAMA_UPSTREAM_DIR}/vendor/cpp-httplib/httplib_stub.cpp")
 target_include_directories(edgeomni_cpp_httplib PUBLIC
-    ../third_party/llama.cpp-omni/vendor/cpp-httplib)
+    "${EDGEOMNI_LLAMA_UPSTREAM_DIR}/vendor/cpp-httplib")
 target_compile_features(edgeomni_cpp_httplib PRIVATE cxx_std_17)
 target_link_libraries(edgeomni_cpp_httplib PRIVATE Threads::Threads)
 
 add_library(edgeomni_service STATIC src/service.cpp)
 target_compile_features(edgeomni_service PUBLIC cxx_std_17)
 target_include_directories(edgeomni_service PUBLIC include
-    ../third_party/llama.cpp-omni/vendor)
+    "${EDGEOMNI_LLAMA_UPSTREAM_DIR}/vendor")
 target_link_libraries(edgeomni_service PUBLIC edgeomni_runtime edgeomni_cpp_httplib Threads::Threads)
 
 if(EDGEOMNI_BUILD_BENCHMARK_TOOLS)
     add_executable(edgeomni_qwen3_benchmark_runner tools/qwen3_benchmark_runner.cpp)
     target_compile_features(edgeomni_qwen3_benchmark_runner PRIVATE cxx_std_17)
     target_include_directories(edgeomni_qwen3_benchmark_runner PRIVATE
-        ../third_party/llama.cpp-omni/vendor)
+        "${EDGEOMNI_LLAMA_UPSTREAM_DIR}/vendor")
     target_link_libraries(edgeomni_qwen3_benchmark_runner PRIVATE edgeomni_runtime)
     set_target_properties(edgeomni_qwen3_benchmark_runner PROPERTIES
         BUILD_RPATH "${EDGEOMNI_LLAMA_BUILD_DIR}/bin")
