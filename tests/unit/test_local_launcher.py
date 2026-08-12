@@ -80,16 +80,24 @@ class LocalLauncherTest(unittest.TestCase):
             instance.run(False, 1)
         self.assertEqual(called, [])
 
-    def test_port_probe_enables_address_reuse_before_bind(self):
+    def test_port_probe_checks_for_a_live_listener_without_binding(self):
         calls = []
         class Probe:
-            def setsockopt(self, *args): calls.append(("setsockopt", args))
-            def bind(self, address): calls.append(("bind", address))
+            def settimeout(self, timeout): calls.append(("settimeout", timeout))
+            def connect_ex(self, address): calls.append(("connect_ex", address)); return 111
             def close(self): calls.append(("close",))
         launcher_module.check_port_available("127.0.0.1", 18086, socket_factory=lambda *_: Probe())
-        self.assertEqual(calls[0][0], "setsockopt")
-        self.assertEqual(calls[1], ("bind", ("127.0.0.1", 18086)))
+        self.assertEqual(calls[0], ("settimeout", 0.5))
+        self.assertEqual(calls[1], ("connect_ex", ("127.0.0.1", 18086)))
         self.assertEqual(calls[2], ("close",))
+
+    def test_port_probe_rejects_a_live_listener(self):
+        class Probe:
+            def settimeout(self, _timeout): pass
+            def connect_ex(self, _address): return 0
+            def close(self): pass
+        with self.assertRaisesRegex(launcher_module.LauncherError, "already in use"):
+            launcher_module.check_port_available("127.0.0.1", 18086, socket_factory=lambda *_: Probe())
 
     def test_assistant_start_failure_cleans_runtime(self):
         runtime = Process()
