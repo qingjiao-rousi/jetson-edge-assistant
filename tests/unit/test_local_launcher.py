@@ -80,6 +80,17 @@ class LocalLauncherTest(unittest.TestCase):
             instance.run(False, 1)
         self.assertEqual(called, [])
 
+    def test_port_probe_enables_address_reuse_before_bind(self):
+        calls = []
+        class Probe:
+            def setsockopt(self, *args): calls.append(("setsockopt", args))
+            def bind(self, address): calls.append(("bind", address))
+            def close(self): calls.append(("close",))
+        launcher_module.check_port_available("127.0.0.1", 18086, socket_factory=lambda *_: Probe())
+        self.assertEqual(calls[0][0], "setsockopt")
+        self.assertEqual(calls[1], ("bind", ("127.0.0.1", 18086)))
+        self.assertEqual(calls[2], ("close",))
+
     def test_assistant_start_failure_cleans_runtime(self):
         runtime = Process()
         calls = 0

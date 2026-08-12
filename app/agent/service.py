@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import argparse
+from collections import deque
 import pathlib
 import re
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Callable, Any
@@ -17,10 +19,44 @@ ALLOWED_TOOLS = frozenset({"search_manuals", "read_manual", "lookup_fault_code"}
 MAX_STEPS = 3
 MAX_SESSIONS = 8
 MAX_TURNS = 20
+MAX_COMPLETED_REQUEST_IDS = 256
 
 
 class ToolContractError(ValueError):
     pass
+
+
+class RequestIdRegistry:
+    """Bound duplicate detection for one process, not a production idempotency store."""
+
+    def __init__(self, capacity: int = MAX_COMPLETED_REQUEST_IDS):
+        if not isinstance(capacity, int) or not 1 <= capacity <= 4096:
+            raise ToolContractError("request_id capacity must be an integer from 1 to 4096")
+        self.capacity = capacity
+        self._active: set[str] = set()
+        self._completed: set[str] = set()
+        self._order: deque[str] = deque()
+        self._lock = threading.Lock()
+
+    def begin(self, request_id: str) -> None:
+        with self._lock:
+            if request_id in self._active or request_id in self._completed:
+                raise ToolContractError("request_id is active or recently completed")
+            self._active.add(request_id)
+
+    def complete(self, request_id: str) -> None:
+        with self._lock:
+            if request_id not in self._active:
+                return
+            self._active.remove(request_id)
+            self._completed.add(request_id)
+            self._order.append(request_id)
+            if len(self._order) > self.capacity:
+                self._completed.remove(self._order.popleft())
+
+    def completed_size(self) -> int:
+        with self._lock:
+            return len(self._order)
 
 
 def _safe_manual_path(raw: str) -> pathlib.Path:
@@ -296,11 +332,12 @@ class AgentApplication:
 
     def __init__(self, tools: ReadOnlyTools, sessions: SessionStore, retrieve: Callable[[str], dict],
                  generate: Callable[[str, list[dict]], str], explain_generate: Callable[[str, list[dict]], str] | None = None,
-                 tool_version: str = "m10.2-readonly-tools-v1"):
+                 tool_version: str = "m10.2-readonly-tools-v1",
+                 request_id_capacity: int = MAX_COMPLETED_REQUEST_IDS):
         self.tools, self.sessions, self.retrieve, self.generate = tools, sessions, retrieve, generate
         self.explain_generate = explain_generate or generate
         self.tool_version = tool_version
-        self.request_ids: set[str] = set()
+        self.request_ids = RequestIdRegistry(request_id_capacity)
 
     @staticmethod
     def _required_string(value: Any, name: str, maximum: int | None = None) -> str:
@@ -318,17 +355,19 @@ class AgentApplication:
         plan_value, audit, turns, status = [], [], 0, "ERROR"
         audit_start = len(self.tools.audit)
         response = None
+        registered_request_id = False
         try:
             if not isinstance(request, dict): raise ToolContractError("request must be a JSON object")
             request_id = self._required_string(request_id, "request_id")
-            if request_id in self.request_ids: raise ToolContractError("request_id must be unique")
-            self.request_ids.add(request_id)
+            self.request_ids.begin(request_id)
+            registered_request_id = True
             if op not in {"answer", "explain", "reset", "health"}: raise ToolContractError("unknown op")
             if op in {"answer", "explain", "reset"}:
                 session_id = self._required_string(session_id, "session_id", 128)
             if op == "health":
                 status = "OK"
-                response = {**base, "status": status, "sessions": self.sessions.size(), "capacity": self.sessions.max_sessions, "tool_version": self.tool_version}
+                response = {**base, "status": status, "sessions": self.sessions.size(), "capacity": self.sessions.max_sessions, "tool_version": self.tool_version,
+                            "completed_request_ids": self.request_ids.completed_size(), "completed_request_id_capacity": self.request_ids.capacity}
             elif op == "reset":
                 self.sessions.reset(session_id); status = "OK"; turns = 0
                 response = {**base, "status": status, "session_turns": turns}
@@ -344,6 +383,8 @@ class AgentApplication:
         except (ToolContractError, OSError, ValueError, KeyError, RuntimeError) as error:
             audit = self.tools.audit[audit_start:]
             response = {**base, "status": "ERROR", "error": str(error), "session_turns": turns}
+        if registered_request_id:
+            self.request_ids.complete(request_id)
         response.update({"request_id": request_id, "session_id": session_id, "op": op, "plan": plan_value, "tool_audit": audit, "session_turns": turns, "status": response.get("status", status), "elapsed_ms": round((time.monotonic() - started) * 1000)})
         return response
 

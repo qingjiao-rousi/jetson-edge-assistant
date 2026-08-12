@@ -48,6 +48,10 @@ def check_runtime_assets(config: dict) -> None:
 def check_port_available(host: str, port: int, socket_factory: Callable[..., socket.socket] = socket.socket) -> None:
     probe = socket_factory(socket.AF_INET, socket.SOCK_STREAM)
     try:
+        # Match the HTTP server's reusable listener semantics. This still
+        # rejects a live listener but does not confuse post-shutdown TCP state
+        # with an active EdgeOmni process.
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         probe.bind((host, port))
     except OSError as error:
         raise LauncherError(f"Runtime port {host}:{port} is already in use; refusing to reuse an existing Runtime") from error

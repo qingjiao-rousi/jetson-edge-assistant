@@ -4,7 +4,7 @@ import sys
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-from app.agent.service import JsonlAgent, ReadOnlyTools, SessionStore
+from app.agent.service import JsonlAgent, ReadOnlyTools, RequestIdRegistry, SessionStore, ToolContractError
 
 
 class AgentM102JsonlTest(unittest.TestCase):
@@ -41,6 +41,24 @@ class AgentM102JsonlTest(unittest.TestCase):
         self.assertEqual(self.request({"request_id": "bad", "op": "unknown", "session_id": "a"})["status"], "ERROR")
         self.assertEqual(self.request({"request_id": "bad2", "op": "answer", "session_id": "", "query": "x"})["status"], "ERROR")
         self.assertEqual(self.request({"request_id": "bad3", "op": "answer", "session_id": "a", "query": "x" * 4097})["status"], "ERROR")
+
+    def test_completed_request_id_registry_is_bounded(self):
+        registry = RequestIdRegistry(capacity=2)
+        registry.begin("first")
+        with self.assertRaises(ToolContractError):
+            registry.begin("first")
+        registry.complete("first")
+        registry.begin("second"); registry.complete("second")
+        with self.assertRaises(ToolContractError):
+            registry.begin("first")
+        registry.begin("third"); registry.complete("third")
+        self.assertEqual(registry.completed_size(), 2)
+        registry.begin("first")
+
+    def test_health_exposes_request_id_memory_bound(self):
+        health = self.request({"request_id": "health-bound", "op": "health"})
+        self.assertEqual(health["completed_request_id_capacity"], 256)
+        self.assertEqual(health["completed_request_ids"], 0)
 
     def test_session_capacity_is_bounded(self):
         for index in range(8):

@@ -86,6 +86,9 @@ if(EDGEOMNI_BUILD_TESTS)
     target_compile_features(edgeomni_service_unit_test PRIVATE cxx_std_17)
     target_link_libraries(edgeomni_service_unit_test PRIVATE edgeomni_service edgeomni_fake_backend edgeomni_cpp_httplib)
     add_test(NAME edgeomni_service_unit_test COMMAND edgeomni_service_unit_test)
+    # 77 is emitted only before HTTP assertions when the test cannot create a
+    # temporary 127.0.0.1 socket. Protocol and assertion failures remain FAIL.
+    set_tests_properties(edgeomni_service_unit_test PROPERTIES SKIP_RETURN_CODE 77)
     add_executable(edgeomni_vlm_contract_unit_test tests/vlm_contract_unit_test.cpp)
     target_compile_features(edgeomni_vlm_contract_unit_test PRIVATE cxx_std_17)
     target_link_libraries(edgeomni_vlm_contract_unit_test PRIVATE edgeomni_runtime edgeomni_fake_backend)
