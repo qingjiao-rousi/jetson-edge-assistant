@@ -56,7 +56,7 @@ scripts/run_jetson_benchmark.sh \
   --tegrastats /usr/bin/tegrastats
 ```
 
-每份 config 必须包含匹配的 main model/MMProj path、size 和 SHA-256，并先通过 `assistant` preflight。当前仓库只固定提供默认 Q4 合同；`assistant-q8.json` 需要根据真实获准 Q8 资产创建，不能复制或猜测 hash。
+每份 config 必须包含匹配的 main model/MMProj path、size 和 SHA-256，并先通过 `assistant` preflight。仓库中的 `assistant-q8.json` 固定了本次获准 Q8 资产的真实大小和 SHA-256；模型文件仍不随仓库分发。若替换资产 revision，必须更新合同并重新预检，不能复制或猜测 hash。
 
 原始输出写入被 Git 忽略的 `benchmarks/results/`。人工复核、脱敏和聚合后，填写 `benchmarks/results-template.csv`；不要直接提交长日志。HTTP collector 使用 `MtmdBackend`，不会把 Qwen2.5-VL 错交给仅接受冻结 Qwen3 hash 的 DirectBackend benchmark runner。
 

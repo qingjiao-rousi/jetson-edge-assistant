@@ -11,6 +11,7 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Model-free repository verification entry point and GitHub Actions workflow.
 - Demo evidence, benchmark protocol, empty result schema, roadmap, contribution and release checklists.
 - Clean-commit Jetson Q4 text baseline with reviewed aggregate CSV and SHA-256 bindings to local raw evidence.
+- Q8 Assistant asset contract with verified model size/hash and Jetson load/ready smoke coverage.
 - Apache-2.0 project license and third-party/model asset notices.
 
 ### Changed

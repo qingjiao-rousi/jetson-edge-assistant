@@ -28,6 +28,7 @@ The following items are ignored by Git and must be supplied by an approved offli
 | --- | --- | --- |
 | Frozen upstream build | `third_party/llama.cpp-omni/build-jetson-release/` | Transfer the complete directory, including symlinks and `bin/libllama.so*`, `libmtmd.so*`, `libggml*.so*`, `llama-embedding`, and `llama-tokenize`. |
 | VLM main model | `models/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf` | 1,929,901,056 bytes; SHA-256 `d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12`. |
+| Optional Q8 comparison model | `models/Qwen2.5-VL-3B-Instruct-Q8_0.gguf` | 3,285,474,304 bytes; SHA-256 `fa8aeb3b6bf6152774e87d13e09892aa065f4e0c4abe90806cd8ab18ff72d9fe`; contract in `configs/assistant-q8.json`. |
 | VLM MMProj | `models/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf` | 844,757,728 bytes; SHA-256 `980c9b2f78c04e6cff93d277ada09e768394f112d75db3b4e9dea8a69f9fb904`. |
 | Embedding model | `models/embedding/Qwen3-Embedding-0.6B-Q8_0.gguf` | 639,150,592 bytes; SHA-256 `06507c7b42688469c4e7298b0a1e16deff06caf291cf0a5b278c308249c3e439`. |
 | RAG database | `generated/rag-m9.1b-r2.2/hybrid.sqlite3` | Prebuilt SQLite; its size, metadata, and source binding are in `configs/contracts/rag-r2.2-delivery-contract.json`. Do not rebuild it here. |

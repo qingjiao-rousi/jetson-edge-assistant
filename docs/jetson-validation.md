@@ -57,3 +57,9 @@
 在 clean commit `376134149939cabd783bcd293d3bb465da8d2e55`、MODE_30W、CPU 1.728 GHz 固定、GPU 612 MHz 固定、EMC override 开启的条件下完成 1 次预热和 15 次非流式文本请求。15/15 为 HTTP 200、无结构化错误、22 prompt token、128 output token；decode throughput 中位数为 15.098 token/s（min 15.084，max 15.231），TTFT 中位数 112 ms（min 112，max 113）。`tegrastats` 的 136 个一秒采样中，统一 RAM 中位数 11,849 MB，GPU 温度中位数 55.593 C。
 
 完整合同、分位数和各功耗 rail 的独立口径见 [Q4 reviewed 汇总](../benchmarks/q4-k-m-locked-20260812.md)。报告绑定 Runtime、collector 和本地 raw artifact hash。该结论只覆盖当前 Q4 文本协议，不是 Q8 对照、VLM 图像性能、长稳或生产 SLA。
+
+## 2026-08-12 Q8 资产与加载冒烟
+
+`configs/assistant-q8.json` 记录 Qwen2.5-VL-3B-Instruct Q8_0 主模型的真实大小 3,285,474,304 bytes 和 SHA-256 `fa8aeb3b6bf6152774e87d13e09892aa065f4e0c4abe90806cd8ab18ff72d9fe`，并继续使用同一 MMProj、context/batch/ubatch、GPU layers、Runtime、RAG 和 Agent 参数。Q8 `assistant` profile 已通过，Q4/Q8 配置差异检查确认实验变量只有主模型资产。
+
+统一 launcher 随后用该 Q8 合同完成 `load -> /ready -> terminal -> /quit`，退出码 0，未发现残留 Runtime 进程。这只证明当前 Q8 资产和固定上游可以加载并进入 ready；尚未发送测量请求，不构成 Q4/Q8 延迟、吞吐、内存、功耗或质量对照。
