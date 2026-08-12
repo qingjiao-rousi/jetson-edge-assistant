@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "milestone": "M9.1B-R2.6-CANDIDATE",
+  "candidate": {
+    "status": "UNVALIDATED",
+    "algorithm_difference": "restore_minimum_keyword_coverage_final_gate",
+    "does_not_replace": "M9.1B-R2.5"
+  },
+  "base_algorithm_fingerprint": "0d84afa229f49d779059ea83d658b768ba91063832377d651702d8d330575df2",
+  "embedding_fingerprint": "d0540b3ebba59a403437b0866625bd5d8392484806b41716a95c528bab4547b9",
+  "retrieval": {
+    "kind": "hybrid-rrf",
+    "top_k": 3,
+    "rrf_k": 60,
+    "admission": {
+      "minimum_vector_score": 0.4,
+      "minimum_keyword_coverage": 0.1,
+      "minimum_margin": 0.0001
+    },
+    "fact_evidence": {"minimum_coverage": 0.25, "minimum_terms": 1}
+  },
+  "quality_gate": {
+    "mode": "hybrid",
+    "minimum_recall_at_1": 0.75,
+    "minimum_recall_at_3": 0.875,
+    "minimum_mrr": 0.8,
+    "minimum_no_answer_correct_rejection_rate": 0.75,
+    "maximum_false_positive_count": 1
+  },
+  "index_contract": {
+    "schema_version": "3",
+    "milestone": "M9.1B-R2",
+    "text_format_version": "structured-v1",
+    "chinese_fts_strategy": "unicode61-cjk-bigram-v1",
+    "algorithm_version": "concept-fact-family-v1",
+    "r2_2_index_fingerprint": "efa33d208db4c9401b06233027e1fc3126051b6bf383bef81d4b3f6a104d103f"
+  }
+}

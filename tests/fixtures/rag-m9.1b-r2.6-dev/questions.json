@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "dataset_id": "rag-m9.1b-r2.6-dev-v1",
+  "purpose": "Independent development-only comparison for frozen R2.6 candidate; not a holdout.",
+  "questions": [
+    {"id": "r26-dev-a01", "query": "What is the AX-17 nominal operating pressure?", "expected_chunk_id": "AX17-MANUAL-001#technical-specifications", "answerable": true, "category": "answerable-exact-specification", "rationale": "AX-17 Technical Specifications states 620 kPa."},
+    {"id": "r26-dev-a02", "query": "BX-9 液压泵允许的流体温度范围是多少？", "expected_chunk_id": "BX9-MANUAL-001#technical-specifications", "answerable": true, "category": "answerable-chinese-specification", "rationale": "BX-9 Technical Specifications gives the permitted fluid temperature range."},
+    {"id": "r26-dev-a03", "query": "What does E42 mean on the BX-9?", "expected_chunk_id": "BX9-MANUAL-001#alarm-e42", "answerable": true, "category": "answerable-device-fault-code", "rationale": "BX-9 Alarm E42 defines the motor winding temperature condition."},
+    {"id": "r26-dev-a04", "query": "CT-4 的 T17 警告表示什么？", "expected_chunk_id": "CT4-MANUAL-001#belt-tracking", "answerable": true, "category": "answerable-chinese-fault-code", "rationale": "CT-4 Belt Tracking defines T17 and the sensor limit."},
+    {"id": "r26-dev-a05", "query": "How often is the scheduled AX-17 inspection performed?", "expected_chunk_id": "AX17-MANUAL-001#maintenance-schedule", "answerable": true, "category": "answerable-maintenance-interval", "rationale": "AX-17 Maintenance Schedule states 500 operating hours."},
+    {"id": "r26-dev-a06", "query": "CT-4 emergency-stop reset key needs to be pressed for how long?", "expected_chunk_id": "CT4-MANUAL-001#emergency-stop-reset", "answerable": true, "category": "answerable-reset-duration", "rationale": "CT-4 Emergency Stop Reset specifies 3 seconds."},
+    {"id": "r26-dev-a07", "query": "Which sound and pressure behavior indicate possible BX-9 cavitation?", "expected_chunk_id": "BX9-MANUAL-001#cavitation-warning", "answerable": true, "category": "answerable-symptom", "rationale": "BX-9 Cavitation Warning names gravel-like rattling and unstable outlet pressure."},
+    {"id": "r26-dev-n01", "query": "What approved compressor oil viscosity grade is required for AX-17?", "expected_chunk_id": null, "answerable": false, "category": "no-answer-missing-device-attribute", "rationale": "The AX-17 manual gives pressure and torque, not an approved oil viscosity grade."},
+    {"id": "r26-dev-n02", "query": "At what temperature in degrees Celsius does BX-9 E42 trip?", "expected_chunk_id": null, "answerable": false, "category": "no-answer-missing-numeric-alarm-attribute", "rationale": "BX-9 E42 names a safe-limit exceedance but does not provide a trip temperature."},
+    {"id": "r26-dev-n03", "query": "What sensor calibration voltage is specified for CT-4 tracking warning T17?", "expected_chunk_id": null, "answerable": false, "category": "no-answer-concept-attribute-mismatch", "rationale": "CT-4 documents a sensor limit, but no calibration voltage."},
+    {"id": "r26-dev-n04", "query": "What torque setting is required before resetting AX-17 E42?", "expected_chunk_id": null, "answerable": false, "category": "no-answer-concept-attribute-mismatch", "rationale": "AX-17 has a torque specification and reset procedure, but no reset torque requirement."},
+    {"id": "r26-dev-n05", "query": "Does BX-9 require hydraulic fluid replacement every 100 operating hours?", "expected_chunk_id": null, "answerable": false, "category": "no-answer-unlisted-maintenance-requirement", "rationale": "BX-9 specifies inlet-strainer inspection at 250 hours, not this fluid replacement requirement."},
+    {"id": "r26-dev-n06", "query": "What does fault T17 mean on AX-17?", "expected_chunk_id": null, "answerable": false, "category": "no-answer-device-fault-code-mismatch", "rationale": "T17 is documented for CT-4, while AX-17 documents E42."},
+    {"id": "r26-dev-n07", "query": "What hydraulic pressure grade must the CT-4 conveyor circuit use?", "expected_chunk_id": null, "answerable": false, "category": "no-answer-generic-term-without-fact", "rationale": "The CT-4 manual has no hydraulic circuit or pressure-grade fact."}
+  ]
+}
