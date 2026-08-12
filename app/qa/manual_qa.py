@@ -14,7 +14,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 from app.retrieval.core import ContractError, provider_from_config
 from app.retrieval.embedding import load_config as load_embedding_config
-from app.retrieval.engine import query_index
+from app.retrieval.active_pipeline import query_index
 
 MILESTONE = "M9.2-PROTOTYPE"
 MANUAL_GROUNDED_SYSTEM_PROMPT = (
