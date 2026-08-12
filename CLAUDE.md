@@ -1,132 +1,51 @@
-# Jetson 工业现场多模态交互与故障辅助系统 — CLAUDE.md
+# EdgeOmni repository guidance
 
-> 本文档供 Claude Code 及其他 AI 编码助手使用，自动加载为会话上下文。
+This file provides repository context for coding assistants. Public capability claims must follow `README.md`, `docs/architecture.md`, `docs/jetson-validation.md`, and `docs/limitations.md`.
 
-## 项目身份
+## Project identity
 
-**完整项目名称**: Jetson 工业现场实时音视频全双工多模态交互与离线设备知识检索及故障辅助系统
-**本仓库模块**: Jetson 端侧离线 LLM/VLM Runtime 与设备故障辅助后端
-**项目性质**: 基于开源 `llama.cpp-omni` 固定 fork 的 Jetson 二次开发
-**最终功能**: 工业现场实时音视频全双工多模态交互，以及离线设备知识检索与故障辅助
-**硬件平台**: Jetson AGX Orin 32GB
-**核心能力**: 离线 LLM/VLM 推理、GGUF/量化、KV Cache、Prefill/Decode、本地 RAG、受限工具和 systemd/Docker 部署
-**当前状态**: Runtime、VLM、RAG、Agent、KV Prefix、语音网关与文本 UI 均有原型；主线运行代码位于 `runtime/` 与 `app/`，冻结结论位于 `evidence/`
-**项目周期**: 三个月端侧 Runtime/故障辅助主线；音视频全双工由其他模块并行集成；蒸馏或剪枝仅作为独立个人研究扩展
+- Project: EdgeOmni, a Jetson AGX Orin offline industrial knowledge-assistant prototype.
+- Runtime: C++ adaptation built on a pinned `llama.cpp-omni` submodule.
+- Application: local SQLite/FTS5 hybrid RAG, citation/refusal gates, bounded read-only Agent, terminal/JSONL and experimental half-duplex audio adapters.
+- VLM scope: one image per request; no video, multi-image batching, or visual-quality claim.
+- KV scope: one hot text session using Token LCP Prefix reuse; no production multi-user cache.
+- RAG status: M9.1B R2.5 is PARTIAL. Its consumed holdout must not be rerun, modified, or used for tuning.
+- Production scope: Docker/systemd, authentication, high concurrency, long soak, AEC/interruption and full duplex are not completed.
 
-## 设计文档
+## Ownership boundary
 
-对话中可按需读取：
+EdgeOmni owns the code in `runtime/`, `app/`, its configs, launchers, validation contracts and tests. The pinned upstream provides GGUF/GGML, CUDA kernels/backend, model loading, tokenizer/sampler and `mtmd`. Do not describe upstream capabilities as original EdgeOmni work, and do not modify `third_party/llama.cpp-omni` from this repository.
 
-- [项目历史总结](archive/superseded/project-docs/总结.md)
-- [阶段证据](evidence/milestones/)
-- [周报](evidence/weekly-reports/)
+Read [architecture](docs/architecture.md) before changing boundaries, [offline setup](docs/jetson-offline-setup.md) before changing build/assets, and [release checklist](docs/release-checklist.md) before public claims.
 
-## 参考上游项目
+## Repository layout
 
-### llama.cpp-omni（核心 Runtime 后端）
-
-```
-路径: ../llama.cpp-omni-master/
-关键目录:
-  examples/    — 官方示例（simple, simple-chat, server, llava 等）
-  tools/       — 命令行工具（main, server, omni, mtmd, quantize, perplexity 等）
-  src/         — C++ 核心源码
-  include/     — 公共头文件
-  ggml/        — 底层张量计算库
-  common/      — 公共工具代码
-  gguf-py/     — Python GGUF 读写工具
-  models/      — 模型支持（qwen2vl, internvl, llama 等）
-  docs/        — 文档（build.md, 模型添加指南等）
-  AGENTS.md    — 上游的 AI 助手协作规范（务必先读）
+```text
+runtime/       C++ backend adapters, service, contracts and tests
+app/           retrieval, QA, Agent, Assistant, UI and audio adapters
+configs/       top-level and module contracts with relative asset paths
+knowledge/     synthetic test manuals, not real operating instructions
+tests/         model-free unit/integration tests and fixed fixtures
+scripts/       thin launchers and read-only verification/benchmark entry points
+benchmarks/    protocol and empty reviewed-result schema
+docs/          current public architecture, validation and limitations
+third_party/   pinned upstream git submodule
 ```
 
-当前 `../llama.cpp-omni-master/` 是已验证但缺少 `.git` 元数据的源码快照，除已记录的 CMake 修复外不再直接扩展。正式二次开发应使用带 Git 元数据的个人 fork，并由主项目通过 submodule 或固定 commit 接入。
+`archive/`, `evidence/`, generated indexes, build trees and models are local/ignored material and must not be required by clean-clone checks or linked as public evidence.
 
-### autonomous-intelligence（借鉴应用层架构）
+## Engineering rules
 
-```
-路径: ../autonomous-intelligence-main/
-关键目录:
-  TauLegacy/   — 主对话循环、记忆、事件通信、语音/视觉服务
-  baby-tau/    — 简化版实现
-  Vision/      — 视觉服务模块
-  qq/          — 编码助手 Agent
-  jetson-super/— Jetson Orin Nano 上手指南
-  AGENTS.md    — 开发的 Python 代码规范（lint/test/type check）
-```
+1. Inspect upstream headers/source before using an API; do not guess signatures.
+2. Keep the upstream adapter boundary explicit and cite upstream file/commit when attribution matters.
+3. Use repository-relative config paths. Reject absolute paths and traversal rather than normalizing them silently.
+4. Do not download models, rebuild indexes, consume frozen holdouts, or access audio hardware in routine tests.
+5. Any performance, memory, power, CUDA, VLM-quality or stability claim needs an actual Jetson record. Otherwise write “待实测” or “不足以证明”.
+6. Do not add GGUF, generated SQLite, raw benchmark/audio logs, private manuals/evidence, secrets or machine-specific paths.
+7. The default retrieval entry point is `app/retrieval/active_pipeline.py`. Candidate retrieval work must remain separate and must not imply a passed gate.
+8. Preserve existing user changes. In particular, publish an importer and a newly added imported module in the same atomic change.
+9. Before completing a model-free change, run `bash scripts/verify_public_repo.sh`. Report CTest pass/skip separately when C++ build assets are available.
 
-### 参考项目的使用原则
+## Public claim hierarchy
 
-- **llama.cpp-omni** — 当前快照只用于基线；正式 Runtime 修改进入个人 fork，自有接口位于 `runtime/` 或 `app/backend/`
-- **autonomous-intelligence** — 借鉴其持续对话、记忆摘要、事件驱动服务拆分的架构思路，用本地组件替代云端依赖（Pinecone→本地向量库、OpenAI→本地模型、Whisper→faster-whisper 等）
-
-## 项目代码组织
-
-```
-vlmllm-main/
-  runtime/         — C++ Runtime、HTTP API、KV Cache 和生命周期
-  app/             — Agent、audio、qa、retrieval、ui 主线服务
-  configs/         — 运行配置
-  knowledge/       — 本地设备手册
-  tests/           — unit、integration 和 fixtures
-  tools/           — benchmark、evaluation、maintenance 工具
-  evidence/        — milestones、benchmarks、weekly-reports
-  archive/         — experiments 与 superseded 历史
-  scripts/         — 薄启动器
-  third_party/     — 固定上游 fork
-```
-
-## 架构原则
-
-1. **上游隔离** — 不修改上游仓库代码；通过 Adapter 层隔离上游 API 变化
-2. **先基线再优化** — 先跑通上游官方最小示例，记录性能基线，再开始二开
-3. **离线优先** — 所有云端依赖必须有本地替代方案；暂时无法替代的标注为"开发期 fallback"
-4. **实测说话** — 不允许用未实测的性能数据作为结论；每个量化格式/模型都要记录实际 TTFT、TPOT、显存
-5. **接口先于实现** — 先定接口签名（如 `initialize(config)`, `generate_text(request)`, `stream_generate()`），再基于实际 API 写适配器
-6. **渐进式拆分** — 初期先在单进程中跑通模块接口，确认功能后再拆成独立进程/服务
-
-## 研发阶段
-
-| 阶段 | 内容 | 当前状态 |
-|------|------|---------|
-| 一：基线 | 环境、构建、模型、CUDA offload、原始日志 | 已完成并收口 |
-| 二：自有 Runtime | Backend、生命周期、流式、超时、取消、metrics | 已完成 M5 阶段验收 |
-| 三：量化性能 | Q4/Q8、KV Cache、Prefill/Decode | 已完成 M6 冻结；KV 固定 F16/F16 |
-| 四：业务闭环 | VLM 图片、本地 RAG、受限工具 | VLM/M8 已收口；RAG M9.1A 进行中；工具未开始 |
-| 五：生产化 | systemd/Docker、健康检查、回滚、长稳 | 待开始 |
-| 独立研究 | 蒸馏或结构化剪枝二选一 | 非业务承诺，待选题 |
-
-## 关键非功能需求
-
-- 完全离线运行
-- 记录 TTFT、TPOT、tokens/s、GPU/RAM/温度/功耗
-- 支持服务退出、重启、异常恢复
-- Docker + systemd 部署
-- 模型版本管理和回滚
-
-## 项目边界（不做的事）
-
-- 机器人、ROS2、SLAM、机械臂
-- DeepStream 多路视频、RTSP/RTMP
-- YOLO 主检测 pipeline（这些属于另一个项目）
-- 不预先承诺 TensorRT-LLM 一定支持 Jetson
-
----
-
-## 与 Claude 的协作约定
-
-本节告诉 Claude **每次对话应该如何展开**，确保输出质量和可控性。
-
-1. **分步执行** — 每次只推进阶段规划中的一个步骤；完成一步、确认结果后，再进行下一步
-2. **修改前告知** — 在创建或修改任何文件之前，先说明会动哪些文件、为什么
-3. **引用上游代码必须精确** — 引用 llama.cpp-omni 或 autonomous-intelligence 中的代码时，必须标注文件路径和行号
-4. **不假设 API** — 不确定的函数签名先去上游仓库搜索确认，不能用"应该"、"可能是"来猜测
-5. **标注文件类型** — 输出代码时明确标注是"新建文件"还是"修改已有文件"
-6. **离线替换提醒** — 如果拟议的方案中出现了云端依赖（OpenAI API、Pinecone 等），主动提醒并给出本地替代建议
-7. **性能结论要实测** — 涉及模型速度、显存、精度等性能判断时，必须基于实际测量数据，不能推测
-8. **先设计再实现** — 涉及新模块或多文件修改时，先输出接口设计让用户确认，再写实现代码
-9. **保持上游分离** — 自有代码写在 `runtime/`、`app/` 与 `tools/` 下，不直接修改 `third_party/llama.cpp-omni`、`../llama.cpp-omni-master/` 或 `../autonomous-intelligence-main/`
-
-当前项目状态统一查阅 [历史总结](archive/superseded/project-docs/总结.md) 与 `evidence/`。本文件和历史设计文档中的阶段
-描述如与该总结冲突，以总结的状态日期为准；冻结实验事实仍以对应 evaluation
-报告为准。
+If documents conflict, use this order: current source/tests and Git state, then `README.md`, `docs/architecture.md`, `docs/jetson-validation.md`, `docs/limitations.md`, and finally archived/ignored records. Never upgrade a frozen summary into numeric or production claims without publishable evidence.

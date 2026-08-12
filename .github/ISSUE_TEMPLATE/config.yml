@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security-sensitive report
+    url: https://github.com/qingjiao-rousi/jetson-edge-assistant/security/advisories/new
+    about: Use a private advisory if the repository is hosted at this location; otherwise contact the maintainer privately.

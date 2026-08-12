@@ -43,6 +43,8 @@ Apache-2.0. The repository records provenance and hashes, not model bytes or a l
 Run the verifier before building or starting anything:
 
 ```bash
+cd /home/nvidia/Desktop/llm/vlmllm-main
+
 python3 scripts/verify_local_assets.py --root . --config configs/assistant.json --profile contract
 python3 scripts/verify_local_assets.py --root . --config configs/assistant.json --profile build-inputs
 python3 scripts/verify_local_assets.py --root . --config configs/assistant.json --profile assistant
@@ -75,3 +77,33 @@ No independent clean-clone plus offline-asset-bundle rehearsal has yet been reco
 exercise succeeds, cross-host upstream-build portability, different JetPack compatibility, real
 model loading, CUDA behavior/performance, VLM accuracy, RAG quality, and voice-device operation
 remain unverified.
+
+## Build and Failure Triage
+
+After `build-inputs` passes, configure and build without downloading or rebuilding upstream:
+
+```bash
+cd /home/nvidia/Desktop/llm/vlmllm-main
+
+cmake -S . -B build-runtime \
+  -DEDGEOMNI_BUILD_TESTS=ON \
+  -DEDGEOMNI_BUILD_INTEGRATION=OFF \
+  -DEDGEOMNI_BUILD_BENCHMARK_TOOLS=ON
+cmake --build build-runtime -j"$(nproc)"
+ctest --test-dir build-runtime --output-on-failure
+```
+
+All paths above are relative to the repository root. If the shell prompt is in `~` (`/home/nvidia`), `scripts/` and `CMakeLists.txt` will not be found. Change directory first or prefix the command with `cd /home/nvidia/Desktop/llm/vlmllm-main &&`.
+
+Interpret common failures conservatively:
+
+| Symptom | Check | Meaning |
+| --- | --- | --- |
+| `find_library` cannot locate `llama` or `mtmd` | `build-inputs` profile and `third_party/llama.cpp-omni/build-jetson-release/bin/` | Frozen upstream build is missing/incomplete; CMake does not build it for you. |
+| ELF architecture check fails | Run the verifier JSON output and `file` on the named library | A non-AArch64 or invalid asset bundle was supplied. |
+| Runtime rejects model before ready | Size/SHA-256 and Runtime diagnostic log path printed by launcher | Asset does not match the pinned contract; do not bypass the check. |
+| Runtime stays unready | CUDA loader dependencies, RPATH, available memory, and captured Runtime log | This is not evidence of model/CUDA validation; preserve the failure record. |
+| CTest service test is skipped with code 77 | Whether the environment permits binding/reaching a temporary `127.0.0.1` port | HTTP assertions did not run. Repeat on a host that permits loopback; do not report the skip as pass. |
+| RAG SQLite check fails | Delivery-contract metadata, source hashes, read-only open | Supply the matching generated index; do not rebuild or alter the frozen holdout during deployment. |
+
+For a public reproducibility claim, perform these commands from a fresh clone/path with only the approved offline bundle, then record commit IDs, profile output, build output, CTest pass/skip counts, and exact Jetson environment. That rehearsal is currently pending.

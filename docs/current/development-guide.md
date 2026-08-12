@@ -26,6 +26,14 @@
 
 M10.1 提供单热文本 Session 的 KV Prefix 复用。M10.2 提供受限、进程内多会话 Agent：最多 8 个 Session、每 Session 最多 20 轮、只读工具与 citation 门禁。它不是生产级多用户系统，不支持 Runtime 层多 Session KV、持久化、鉴权、LRU/TTL 或跨进程共享。
 
+每个 Runtime 和 Agent 进程仅记录最近 256 个**已完成** request-id；活动 ID 和这 256 个 ID 会被拒绝为重复，达到容量后最早完成的 ID 被遗忘并可再次提交。该机制只限制单进程内存增长并便于诊断，不是生产幂等服务，不提供 TTL、LRU、多租户隔离、持久化或跨进程共享。
+
+## 活动 RAG 路径
+
+业务层只经 `app/retrieval/active_pipeline.py` 查询 RAG；`app/qa/manual_qa.py` 是该入口的应用消费者。当前入口保留冻结的 R2.5 query-time fact-family gate 和全部原有阈值、参数与响应合同。它读取的是 R2.2 SQLite index 合同：R2.2 负责已生成 SQLite 的索引元数据，R2.5 不重建或改写索引，只在查询时在冻结 R2 基础排序结果之上执行 gate。
+
+`core.py`、`retrieval.py`、`embedding.py`、`hybrid.py`、`lexical.py` 和 `engine.py` 是保留的历史/基础实现，其中阶段名称只用于实现溯源与冻结证据。不要让新的业务模块直接依赖这些带 R2.1/R2.2/R2.4/R2.5 阶段名称的文件。M9.1B R2.5 仍为 PARTIAL；holdout 已消费，不能重跑、修改或用于调参。
+
 ## 统一 Assistant
 
 默认入口由启动器管理 Runtime 和终端 Assistant：

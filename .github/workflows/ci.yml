@@ -1,0 +1,31 @@
+name: public-contract
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  model-free-checks:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out pinned source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+      - name: Use Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Verify public repository contracts
+        run: bash scripts/verify_public_repo.sh
+
+      - name: Record validation boundary
+        run: |
+          echo "This job does not build the AArch64/CUDA Runtime."
+          echo "It does not download models, consume RAG holdouts, or claim Jetson validation."
