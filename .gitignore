@@ -2,6 +2,9 @@
 models/
 *.gguf
 .venv/
+.env
+.env.*
+!.env.example
 generated/
 
 # Native and CMake build trees
@@ -21,6 +24,10 @@ outputs/
 tmp/
 temp/
 *.tmp
+*.log
+*.trace
+core
+core.*
 *.sqlite3
 *.sqlite
 *.db
@@ -34,6 +41,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
 .idea/
 .vscode/
 .DS_Store
@@ -43,6 +53,10 @@ __pycache__/
 *.pcm
 *.mp3
 demo-output/
+benchmarks/results/*.csv
+benchmarks/results/*.jsonl
+benchmarks/results/*.log
+benchmarks/results/*.txt
 
 archive/
 evidence/

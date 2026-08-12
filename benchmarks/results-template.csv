@@ -1,0 +1,1 @@
+status,commit,upstream_commit,timestamp_utc,device,l4t,cuda,power_mode,jetson_clocks,model,quantization,model_sha256,prompt_sha256,context_tokens,batch_tokens,ubatch_tokens,gpu_layers,threads,warmups,repetitions,metric,unit,n_valid,median,p90,min,max,telemetry_source,notes
