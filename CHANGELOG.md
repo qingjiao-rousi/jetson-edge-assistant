@@ -12,6 +12,7 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Demo evidence, benchmark protocol, empty result schema, roadmap, contribution and release checklists.
 - Clean-commit Jetson Q4 text baseline with reviewed aggregate CSV and SHA-256 bindings to local raw evidence.
 - Q8 Assistant asset contract with verified model size/hash and Jetson load/ready smoke coverage.
+- Clean-commit paired Q4/Q8 text comparison with reviewed performance/resource boundaries.
 - Apache-2.0 project license and third-party/model asset notices.
 
 ### Changed
@@ -19,8 +20,9 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Public submodule URL uses HTTPS while the gitlink commit remains pinned.
 - README separates clean-clone verification from the asset-complete Jetson runtime path.
 - Jetson benchmark collection uses the configured persistent VLM Runtime over HTTP rather than the Qwen3-only DirectBackend runner.
+- Runtime port preflight checks for a live listener without binding a probe socket, allowing safe back-to-back benchmark runs after normal shutdown.
 
 ### Known limitations
 
 - RAG M9.1B R2.5 remains PARTIAL.
-- Q8 comparison, VLM latency/quality, long-run stability, wall power and demo captures remain pending evidence.
+- VLM latency/quality, long-run stability, wall power and demo captures remain pending evidence.

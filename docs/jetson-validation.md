@@ -17,12 +17,12 @@
 | 证据 | 当前公开状态 | 下一步 |
 | --- | --- | --- |
 | 37/37 CUDA layer offload | clean Q4 Runtime 日志已核对，公开报告绑定其 SHA-256 | 原始长日志仍保留在 Git-ignored 本地证据目录 |
-| Q4/Q8 各 15 次基线 | clean Q4 锁频文本数值已公开；Q8 仍只有冻结摘要 | 按同协议采集 Q8；此前禁止计算 Q4/Q8 收益 |
-| 功耗、RAM/GPU 内存、温度 | clean Q4 报告包含板载 rail、统一 RAM 和温度统计；不是墙插功耗或长期峰值 | Q8 保持相同口径；GPU 专用内存不足以从统一内存遥测中单独证明 |
+| Q4/Q8 各 15 次基线 | 同 clean commit 锁频配对文本数值已公开 | 速度近似持平；Q4 的部署优先理由是资源效率，不外推到单图、长上下文或质量 |
+| 功耗、RAM/GPU 内存、温度 | Q4/Q8 报告包含板载 rail、统一 RAM、CUDA model buffer 和温度统计 | 不是墙插功耗、独立 GPU 内存遥测或长期峰值；长稳仍待实测 |
 | 长稳与错误率 | 不足以证明 | 待定义 30-60 分钟串行 soak 并记录请求数/错误/资源趋势 |
 | 生产并发/SLA | 未实现且不足以证明 | 不应由当前单活动请求原型外推 |
 
-因此，“Q4 是部署优先候选”可以作为冻结对照中的选择复述；在 Q8 同协议公开表格完成前，仍不能写成具体加速比、内存节省或功耗收益。
+因此，“Q4 是部署优先候选”现在可由 clean-commit 配对文本结果支持：稳定 decode 速度近似持平，而 Q4 使用更少统一 RAM、CUDA model buffer，并具有更短 model-ready 时间。该结论仍不能外推到单图、长上下文、质量或长稳。
 
 ## M12 终端单图冒烟
 
@@ -63,3 +63,9 @@
 `configs/assistant-q8.json` 记录 Qwen2.5-VL-3B-Instruct Q8_0 主模型的真实大小 3,285,474,304 bytes 和 SHA-256 `fa8aeb3b6bf6152774e87d13e09892aa065f4e0c4abe90806cd8ab18ff72d9fe`，并继续使用同一 MMProj、context/batch/ubatch、GPU layers、Runtime、RAG 和 Agent 参数。Q8 `assistant` profile 已通过，Q4/Q8 配置差异检查确认实验变量只有主模型资产。
 
 统一 launcher 随后用该 Q8 合同完成 `load -> /ready -> terminal -> /quit`，退出码 0，未发现残留 Runtime 进程。这只证明当前 Q8 资产和固定上游可以加载并进入 ready；尚未发送测量请求，不构成 Q4/Q8 延迟、吞吐、内存、功耗或质量对照。
+
+## 2026-08-12 Q4/Q8 clean-commit 配对文本基线
+
+在同一 clean commit `7a9d40eb262ca718352a00d3f6864da86dfb0571` 和相同锁频/输入/Runtime/MMProj 参数下，Q4 与 Q8 各完成 1 次预热和 15 次有效请求。两者均为 15/15 HTTP 200、37/37 layer offload 并正常停止。
+
+Q4/Q8 decode throughput 中位数分别为 15.101/15.227 token/s，Runtime total 中位数为 8,491/8,422 ms，属于该短文本协议下的近似持平。Q8 的统一 RAM 中位数为 13,928 MB，相比 Q4 的 12,458 MB 增加 1,470 MB；CUDA model buffer 增加 1,292.78 MiB，单次 model ready 从 4,808 ms 增至 6,894 ms。因此当前选择 Q4_K_M 的公开理由是资源效率，不是宣称 Q4 速度更快。完整口径、telemetry 和 artifact hash 见 [配对报告](../benchmarks/q4-q8-paired-20260812.md)。

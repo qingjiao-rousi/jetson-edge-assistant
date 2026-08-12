@@ -13,7 +13,7 @@ EdgeOmni 面向无云网络的工业设备知识问答与**单图**故障诊断�
 | 做了什么 | 文本/单图 Runtime、HTTP/JSON/SSE、超时取消、`/ready`、单热 KV Prefix reuse、本地 Hybrid RAG、引用/拒答门禁、受限 Agent、终端与半双工语音适配 |
 | EdgeOmni 自己实现什么 | `runtime/src/` 的服务与适配层、`app/` 的检索/Agent/Assistant、离线资产合同与验证脚本；详见 [组件所有权](docs/architecture.md#组件所有权) |
 | 上游提供什么 | `llama.cpp-omni` 提供 GGML/GGUF、模型加载、CUDA 后端、tokenizer/sampler、`mtmd` 等基础能力；EdgeOmni **没有**重写 CUDA kernel 或通用 KV Cache |
-| 实机验证到哪里 | clean commit `3761341` 已完成 Jetson Q4 锁频文本基线：15/15 成功、TTFT 中位数 112 ms、decode 中位数 15.098 token/s，并记录 37/37 CUDA layer offload；Q8 同协议公开对照仍待实测 |
+| 实机验证到哪里 | clean commit `7a9d40e` 已完成 Jetson Q4/Q8 配对文本基线：各 15/15 成功并记录 37/37 CUDA layer offload；decode 速度近似持平，Q8 统一 RAM 多 1,470 MB |
 | 怎么复核 | clone 后运行 `bash scripts/verify_public_repo.sh`；资产齐备后运行 `python3 scripts/run_local_assistant.py` |
 
 ## 架构
@@ -41,7 +41,7 @@ flowchart LR
 | C++ FakeBackend/Runtime 合同 | 已验证但环境相关 | 当前已有单元测试；HTTP socket 测试可能因沙箱禁止回环绑定而 skip | `runtime/tests/`；CI/本机结果需分别披露 |
 | Jetson CUDA 构建/offload | 已有冻结记录 | Jetson AGX Orin 上记录 37/37 layer offload | [Jetson 验证摘要](docs/jetson-validation.md)；完整公开日志待补 |
 | Q4_K_M 文本基线 | **已验证** | MODE_30W 锁频，1 次预热 + 15 次请求；TTFT median 112 ms，decode median 15.098 token/s | [reviewed Q4 报告](benchmarks/q4-k-m-locked-20260812.md)；短时单请求结果，不是生产 SLA |
-| Q8_0 同协议对照 | 待实测 | 冻结历史记录仅支持“Q4 为部署优先候选” | 尚无与当前 clean Q4 协议匹配的公开数值，不能发布加速比、内存或功耗收益 |
+| Q4_K_M / Q8_0 配对 | **已验证** | 同一 clean commit、锁频协议下 decode median 为 15.101 / 15.227 token/s；统一 RAM median 为 12,458 / 13,928 MB | [配对报告](benchmarks/q4-q8-paired-20260812.md)；速度近似持平，Q4 以资源效率作为部署优先候选 |
 | 单图 VLM | 固定冒烟 | 合成 fixture 单图、单请求、非流式链路通过 | 不代表准确率、多图或视频能力 |
 | RAG 质量 | **PARTIAL** | 引用与拒答门禁存在 | R2.5 最终质量门未通过，holdout 已消费且不可重跑/调参 |
 | 长稳、高并发、生产鉴权 | 待实测/未实现 | 不作生产能力声明 | [限制](docs/limitations.md) |
