@@ -10,6 +10,7 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Explicit edge-AI deployment stack and model-replacement compatibility matrix.
 - Model-free repository verification entry point and GitHub Actions workflow.
 - Demo evidence, benchmark protocol, empty result schema, roadmap, contribution and release checklists.
+- Clean-commit Jetson Q4 text baseline with reviewed aggregate CSV and SHA-256 bindings to local raw evidence.
 - Apache-2.0 project license and third-party/model asset notices.
 
 ### Changed
@@ -21,4 +22,4 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 ### Known limitations
 
 - RAG M9.1B R2.5 remains PARTIAL.
-- Reviewed public Q4/Q8 numeric results, long-run stability, power/resource tables and demo captures are pending Jetson execution.
+- Q8 comparison, VLM latency/quality, long-run stability, wall power and demo captures remain pending evidence.

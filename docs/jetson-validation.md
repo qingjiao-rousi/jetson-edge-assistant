@@ -16,9 +16,9 @@
 
 | 证据 | 当前公开状态 | 下一步 |
 | --- | --- | --- |
-| 37/37 CUDA layer offload | 冻结摘要；完整脱敏加载日志未随仓库提供 | 待 Jetson 复核并发布小型脱敏记录 |
-| Q4/Q8 各 15 次基线 | Q4 已有 dirty-worktree 锁频暂定数值；Q8 仍只有冻结摘要 | 提交代码后复跑 Q4，再按同协议采集 Q8，禁止用当前数据计算 Q4/Q8 收益 |
-| 功耗、RAM/GPU 内存、温度 | Q4 暂定报告包含板载 rail、RAM 和温度统计；不是墙插功耗或长期峰值 | clean commit 复跑并保留相同口径；GPU 专用内存不足以从统一内存遥测中单独证明 |
+| 37/37 CUDA layer offload | clean Q4 Runtime 日志已核对，公开报告绑定其 SHA-256 | 原始长日志仍保留在 Git-ignored 本地证据目录 |
+| Q4/Q8 各 15 次基线 | clean Q4 锁频文本数值已公开；Q8 仍只有冻结摘要 | 按同协议采集 Q8；此前禁止计算 Q4/Q8 收益 |
+| 功耗、RAM/GPU 内存、温度 | clean Q4 报告包含板载 rail、统一 RAM 和温度统计；不是墙插功耗或长期峰值 | Q8 保持相同口径；GPU 专用内存不足以从统一内存遥测中单独证明 |
 | 长稳与错误率 | 不足以证明 | 待定义 30-60 分钟串行 soak 并记录请求数/错误/资源趋势 |
 | 生产并发/SLA | 未实现且不足以证明 | 不应由当前单活动请求原型外推 |
 
@@ -52,8 +52,8 @@
 
 一次 MODE_30W、`jetson_clocks --show` 但未实际执行 `jetson_clocks` 的 15 样本文本运行完成。日志显示 CPU governor 仍为 `schedutil`、GPU min/max 不同且 EMC `FreqOverride=0`；decode throughput 在同一批次后段出现约 7.2-7.6 tok/s 到约 14.4 tok/s 的明显台阶，同时板载 GPU_SOC rail 档位变化。因此该批次仅保留为 ignored raw diagnostic，**不进入公开 Q4 基线表，也不能用于 Q4/Q8 对照**。采集器现已默认要求锁频状态。
 
-## 2026-08-12 Q4 锁频文本基线（暂定）
+## 2026-08-12 Q4 锁频文本基线（clean commit）
 
-随后在 MODE_30W、CPU 1.728 GHz 固定、GPU 612 MHz 固定、EMC override 开启的条件下完成 1 次预热和 15 次非流式文本请求。15/15 为 HTTP 200、无结构化错误、22 prompt token、128 output token；decode throughput 中位数为 15.110 token/s（min 15.089，max 15.222），TTFT 中位数 113 ms（min 110，max 119）。`tegrastats` 的 136 个一秒采样中，RAM 中位数 11,655 MB，GPU 温度中位数 59.5 C。
+在 clean commit `376134149939cabd783bcd293d3bb465da8d2e55`、MODE_30W、CPU 1.728 GHz 固定、GPU 612 MHz 固定、EMC override 开启的条件下完成 1 次预热和 15 次非流式文本请求。15/15 为 HTTP 200、无结构化错误、22 prompt token、128 output token；decode throughput 中位数为 15.098 token/s（min 15.084，max 15.231），TTFT 中位数 112 ms（min 112，max 113）。`tegrastats` 的 136 个一秒采样中，统一 RAM 中位数 11,849 MB，GPU 温度中位数 55.593 C。
 
-完整合同、分位数和各功耗 rail 的独立口径见 [Q4 暂定汇总](../benchmarks/q4-k-m-locked-20260812.md)。该结果来自 dirty worktree，虽已绑定 Runtime/collector/raw artifact hash，仍应在整理并提交代码后复核一次，才能升级为最终 clean-commit 可复现基线。它不是 Q8 对照、VLM 图像性能、长稳或生产 SLA。
+完整合同、分位数和各功耗 rail 的独立口径见 [Q4 reviewed 汇总](../benchmarks/q4-k-m-locked-20260812.md)。报告绑定 Runtime、collector 和本地 raw artifact hash。该结论只覆盖当前 Q4 文本协议，不是 Q8 对照、VLM 图像性能、长稳或生产 SLA。
