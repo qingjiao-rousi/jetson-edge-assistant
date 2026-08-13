@@ -14,7 +14,7 @@
 
 ## 运行边界
 
-- `runtime/` 是 C++ LLM/VLM Runtime，负责模型推理、KV Prefix 复用和 HTTP/SSE 服务。
+- `runtime/` 是 C++ LLM/VLM Runtime，负责模型推理和 HTTP/SSE 服务；KV Prefix 复用当前只在 `DirectBackend` 验证路径实现，`MtmdBackend` 主路径接入仍是计划工作。
 - `app/` 是 Python 应用层，负责 RAG、受限 Agent、UI 和语音编排。
 - `app/assistant/` 是统一应用编排层：它连接独立常驻的 C++ Runtime HTTP 服务与进程内
   Agent/RAG/ReadOnlyTools/SessionStore，再由终端与半双工音频适配器使用。
@@ -24,7 +24,7 @@
 
 ## 当前能力边界
 
-M10.1 提供单热文本 Session 的 KV Prefix 复用。M10.2 提供受限、进程内多会话 Agent：最多 8 个 Session、每 Session 最多 20 轮、只读工具与 citation 门禁。它不是生产级多用户系统，不支持 Runtime 层多 Session KV、持久化、鉴权、LRU/TTL 或跨进程共享。
+M10.1 在 `DirectBackend` 提供单热文本 Session 的 KV Prefix 复用原型；实际 Qwen2.5-VL `MtmdBackend` 当前仍是 cold-per-request。M10.2 提供受限、进程内多会话 Agent：最多 8 个 Session、每 Session 最多 20 轮、只读工具与 citation 门禁。它不是生产级多用户系统，不支持 Runtime 层多 Session KV、持久化、鉴权、LRU/TTL 或跨进程共享。
 
 每个 Runtime 和 Agent 进程仅记录最近 256 个**已完成** request-id；活动 ID 和这 256 个 ID 会被拒绝为重复，达到容量后最早完成的 ID 被遗忘并可再次提交。该机制只限制单进程内存增长并便于诊断，不是生产幂等服务，不提供 TTL、LRU、多租户隔离、持久化或跨进程共享。
 

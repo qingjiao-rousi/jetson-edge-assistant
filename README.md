@@ -4,13 +4,13 @@
 
 EdgeOmni 面向无云网络的工业设备知识问答与**单图**故障诊断：在 Jetson AGX Orin（ARM64/CUDA）上使用本地 GGUF 模型，通过 C++ HTTP/JSON/SSE Runtime 提供推理服务，并由本地 RAG、引用门禁和进程内 Agent 组织终端交互。它是可审计的离线原型，不是生产级多用户平台。
 
-> **当前质量状态：** RAG M9.1B R2.5 为 **PARTIAL**，最终质量门未通过；KV 只实现单热文本 session 的 Token LCP Prefix reuse；Docker/systemd、鉴权、高并发和长稳压测尚未完成。
+> **当前质量状态：** RAG M9.1B R2.5 为 **PARTIAL**，最终质量门未通过；单热文本 Token LCP Prefix reuse 当前只在 `DirectBackend` 验证路径完成，实际 Qwen2.5-VL `MtmdBackend` 主路径仍待独立优化和实测；Docker/systemd、鉴权、高并发和长稳压测尚未完成。
 
 ## 30 秒概览
 
 | 招聘者关心的问题 | 仓库证据 |
 | --- | --- |
-| 做了什么 | 文本/单图 Runtime、HTTP/JSON/SSE、超时取消、`/ready`、单热 KV Prefix reuse、本地 Hybrid RAG、引用/拒答门禁、受限 Agent、终端与半双工语音适配 |
+| 做了什么 | 文本/单图 Runtime、HTTP/JSON/SSE、超时取消、`/ready`、`DirectBackend` 单热 KV 原型、本地 Hybrid RAG、引用/拒答门禁、受限 Agent、终端与半双工语音适配 |
 | EdgeOmni 自己实现什么 | `runtime/src/` 的服务与适配层、`app/` 的检索/Agent/Assistant、离线资产合同与验证脚本；详见 [组件所有权](docs/architecture.md#组件所有权) |
 | 上游提供什么 | `llama.cpp-omni` 提供 GGML/GGUF、模型加载、CUDA 后端、tokenizer/sampler、`mtmd` 等基础能力；EdgeOmni **没有**重写 CUDA kernel 或通用 KV Cache |
 | 实机验证到哪里 | clean commit 已完成 Jetson Q4/Q8 配对文本和固定单图基线：均为各 15/15 成功、37/37 CUDA layer offload；Q4 以资源效率作为部署优先理由 |
@@ -24,7 +24,7 @@ flowchart LR
     UI --> A[EdgeOmni Agent\nSessionStore + 只读工具]
     A --> R[EdgeOmni RAG\nSQLite + FTS5 hybrid]
     A --> S[EdgeOmni C++ Service\nHTTP / JSON / SSE]
-    S --> B[EdgeOmni Backend Adapter\n超时 / 取消 / 单热 Prefix reuse]
+    S --> B[EdgeOmni Backend Adapter\n超时 / 取消\nDirectBackend 单热 Prefix reuse]
     B --> L[llama.cpp-omni\nGGUF / GGML / CUDA / mtmd]
     L --> M[本地 Qwen2.5-VL GGUF]
     A --> C[带引用回答 / 拒答]
@@ -32,6 +32,12 @@ flowchart LR
 ```
 
 完整数据流、所有权和能力边界见 [架构说明](docs/architecture.md)。
+
+## 当前基线与深入优化
+
+`d11617e` 是当前**公开作品集基线**：声明范围内的离线原型、公开工程材料以及 Q4/Q8 文本/固定单图短时实机证据已完成；它不是生产版本，也不表示质量、长稳或深度性能优化已经完成。
+
+基线之后的第一优化方向是实际 Qwen2.5-VL `MtmdBackend` text-only Prefix Reuse，主攻长上下文 Prefill/TTFT；随后依次考虑 Nsight 驱动的 decode、VLM 多分辨率性能/质量权衡，以及 profiling 证明值得做的 RAG/HTTP 小开销。实时状态、正确性门、实验协议和整合条件见 [深入优化路线](docs/optimization-roadmap.md)。
 
 ## 已验证与待实测
 
@@ -87,7 +93,7 @@ python3 scripts/run_local_assistant.py --speak
 ## 本项目的二次开发范围
 
 - **C++ Runtime/服务层：** 请求合同、HTTP/JSON/SSE、`/health`/`/ready`、timeout/cancel、单请求并发保护、固定容量 request-id 记录、指标输出和单图 VLM 适配。
-- **推理状态管理：** 单个 hot text session 的 Token LCP Prefix reuse、分叉/回滚与异常失效；不是多用户 KV Cache。
+- **推理状态管理：** `DirectBackend` 已实现单个 hot text session 的 Token LCP、分叉/回滚与异常失效；实际 Qwen2.5-VL `MtmdBackend` 仍为 cold-per-request，计划在独立实验中优化；两者都不是多用户 KV Cache。
 - **离线知识链路：** SQLite/FTS5 hybrid 检索、设备/故障码约束、无证据短路、引用保留与 citation 门禁。
 - **受限应用层：** 进程内 SessionStore、最多 3 步的只读工具规划、JSONL/终端/半双工语音适配和统一启动器。
 - **部署合同：** 仓库相对路径、模型大小/SHA-256、submodule commit、AArch64 ELF 和 SQLite source binding 的只读检查。
@@ -102,7 +108,7 @@ python3 scripts/run_local_assistant.py --speak
 | 推理底座 | `llama.cpp-omni`、GGUF/GGML、CUDA offload、`mtmd` | 固定 submodule；`runtime/CMakeLists.txt` 导入冻结 `.so`；`MtmdBackend` 调用上游 C API |
 | C++ Runtime | C++17、CMake、RAII、OpenSSL EVP、threads/atomics/mutex | `runtime/src/direct_backend.cpp`、`mtmd_backend.cpp`、`vlm_asset_verifier.cpp` |
 | 服务化 | `cpp-httplib`、HTTP/JSON/SSE、`/health`/`/ready`、timeout/cancel、429 busy、结构化 metrics | `runtime/src/service.cpp` 和 FakeBackend contract tests |
-| 推理状态与优化 | context/batch/ubatch、GPU layers、Flash Attention 开关、单热 Token LCP Prefix reuse、prefill/decode/TTFT/TPS 指标 | `RuntimeConfig`、`direct_backend.cpp`、`runtime/tools/qwen3_benchmark_runner.cpp` |
+| 推理状态与优化 | context/batch/ubatch、GPU layers、Flash Attention、`DirectBackend` 单热 Token LCP 原型、prefill/decode/TTFT/TPS 指标 | `RuntimeConfig`、`direct_backend.cpp`、`runtime/tools/qwen3_benchmark_runner.cpp`；`MtmdBackend` 接入为 OPT-1 |
 | 本地 RAG | Python 3、SQLite/FTS5、GGUF embedding、Hybrid/RRF、设备/故障码约束、citation/refusal gate | `app/retrieval/`、`app/qa/manual_qa.py`、`configs/embedding.json` |
 | 边缘应用编排 | 进程内只读 Agent、SessionStore、JSONL/终端、实验性 ASR/VAD/TTS 半双工适配 | `app/agent/`、`app/assistant/`、`app/audio/` |
 | 离线交付与可观测性 | 相对路径、SHA-256/size、submodule commit、SQLite binding、`tegrastats`、模型无关 CI | `scripts/verify_local_assets.py`、`run_local_assistant.py`、[Benchmark 协议](docs/benchmark-protocol.md) |
@@ -139,9 +145,9 @@ docs/          架构、验证、边界、Demo 和发布记录
 ## 项目边界与 Roadmap
 
 - 单图、单请求原型；不支持视频、多图、批处理或高并发。
-- Runtime 只有一个 hot KV session；Agent session 也仅为进程内有界状态。
+- `DirectBackend` 只有一个 hot KV session；`MtmdBackend` 当前 cold-per-request；Agent session 仅为进程内有界状态。
 - request-id 记录只保留最近 256 个已完成请求，不是 TTL/LRU、持久化或多租户幂等服务。
 - 语音为实验性半双工；外接麦克风、AEC、打断和全双工未验证。
 - Docker/systemd 不是当前 P0：systemd 可作为 Jetson 运维 P1；生产鉴权、并发调度和长稳属于需重新定义 SLA 的 P1/P2。
 
-详见 [当前限制](docs/limitations.md)、[完整作品集评审](docs/portfolio-review.md)、[模型替换说明](docs/model-replacement.md)、[Roadmap](ROADMAP.md)、[发布检查清单](docs/release-checklist.md) 和 [贡献指南](CONTRIBUTING.md)。仓库代码采用 [Apache-2.0](LICENSE)；模型和第三方代码遵循各自许可证，模型权重不随仓库分发。
+详见 [当前限制](docs/limitations.md)、[完整作品集评审](docs/portfolio-review.md)、[深入优化路线](docs/optimization-roadmap.md)、[模型替换说明](docs/model-replacement.md)、[Roadmap](ROADMAP.md)、[发布检查清单](docs/release-checklist.md) 和 [贡献指南](CONTRIBUTING.md)。仓库代码采用 [Apache-2.0](LICENSE)；模型和第三方代码遵循各自许可证，模型权重不随仓库分发。

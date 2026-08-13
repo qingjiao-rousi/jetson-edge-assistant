@@ -25,6 +25,7 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Jetson benchmark collection uses the configured persistent VLM Runtime over HTTP rather than the Qwen3-only DirectBackend runner.
 - Runtime port preflight checks for a live listener without binding a probe socket, allowing safe back-to-back benchmark runs after normal shutdown.
 - Runtime image metrics track measurement availability separately from integer millisecond values and split preprocessing, vision encoding and image-embedding injection around stable upstream mtmd APIs.
+- Documented `d11617e` as the public portfolio baseline and separated existing DirectBackend Prefix Reuse from the planned Qwen2.5-VL MtmdBackend optimization path.
 
 ### Known limitations
 

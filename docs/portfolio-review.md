@@ -103,7 +103,7 @@
 
 - 当前评分：**8.8/10**。
 - 是否适合作为主项目：**适合端侧 AI 部署/C++ Runtime/Jetson 岗位的主项目**。当前已有同 commit Q4/Q8 配对文本、固定单图 E2E 和视觉阶段计时结果；投递前最值得补的是 2-3 个真实 Demo 截图/GIF、VLM 小型质量集和长稳记录。
-- 主要加分：C++ Runtime 并非薄命令包装；HTTP/SSE/取消超时、单热 KV 状态、资产合同、RAG/Agent 门禁和测试都有代码证据。
+- 主要加分：C++ Runtime 并非薄命令包装；HTTP/SSE/取消超时、`DirectBackend` 单热 KV 状态、资产合同、RAG/Agent 门禁和测试都有代码证据。
 - 主要扣分：准确率/长稳仍缺公开证据、RAG PARTIAL、HTTP 测试本环境 skip、clean-clone+离线包未独立演练。
 
 推荐 GitHub 标题：**EdgeOmni: Offline Multimodal RAG Assistant on Jetson AGX Orin**
@@ -113,7 +113,7 @@
 ### 简历描述：端侧 AI 部署 / 推理优化 / C++ Runtime
 
 - 基于固定 commit 的 `llama.cpp-omni` 二次开发 C++17 Runtime 服务层，设计 HTTP/JSON/SSE、`/ready`、结构化错误、超时/取消、单活动请求保护与可观测指标合同。
-- 基于上游 KV memory API 实现单热文本 session 的 Token LCP Prefix reuse，覆盖同前缀、分叉、回滚以及图像/取消/超时/异常失效；明确不包装为生产多用户缓存。
+- 基于上游 KV memory API 在 `DirectBackend` 验证路径实现单热文本 session 的 Token LCP Prefix reuse，覆盖同前缀、分叉、回滚以及图像/取消/超时/异常失效；实际 Qwen2.5-VL `MtmdBackend` 接入与 Prefill/TTFT 实测列为独立优化课题，不包装为生产多用户缓存。
 - 为 Qwen2.5-VL-3B GGUF 建立模型/MMProj 大小与 SHA-256、AArch64 ELF、submodule commit 和 SQLite source binding 的离线资产合同与只读 preflight。
 - 建立 Q4_K_M/Q8_0 可复现实验协议与 Jetson 采集器；同一 clean commit 下各完成 15 次锁频请求，decode 中位数 15.101/15.227 token/s、统一 RAM 中位数 12,458/13,928 MB，并通过 SHA-256 绑定 Runtime/collector/raw evidence。
 - 为固定合成单图建立 Q4/Q8 clean-commit E2E 对照：15/15 请求成功，Runtime total 中位数 1,530/1,462 ms，同时明确 `not_measured` 视觉阶段零值不可当作 0 ms 结论。
@@ -129,7 +129,7 @@
 ### 招聘者可能追问的 10 个问题与建议回答
 
 1. **你与 llama.cpp-omni 的边界是什么？** 上游负责 GGUF/GGML、CUDA、加载、tokenizer/sampler 和 mtmd；我负责服务合同、适配、状态管理、RAG/Agent/启动与离线校验，证据在 `docs/architecture.md` 的所有权表。
-2. **KV 优化是不是自己写了 KV Cache？** 不是。底层 KV 由上游提供；我实现的是单 hot session 的 Token LCP、KV 范围保留/回滚和失效策略，不是 paged KV 或多用户缓存。
+2. **KV 优化是不是自己写了 KV Cache？** 不是。底层 KV 由上游提供；当前在 `DirectBackend` 实现的是单 hot session 的 Token LCP、KV 范围保留/回滚和失效策略，不是 paged KV 或多用户缓存。Qwen2.5-VL 主路径接入仍处于计划阶段，不能提前宣称收益。
 3. **为什么只能单热 session？** 当前 Runtime 串行化 backend，并只保存一组 session_id/prompt tokens；这是为了受控内存和可验证状态。多 session 需要内存预算、调度与淘汰策略，不能用 Agent 的 8 个逻辑 session 代替。
 4. **Q4 为什么优先于 Q8？快多少？** 配对文本结果中 Q8 decode 仅高 0.83%、总延迟低 0.81%，应视为近似持平；但 Q8 统一 RAM 多 1,470 MB、CUDA model buffer 多 1,292.78 MiB、model ready 慢 43.4%，所以 Q4 的优势是资源效率，不是速度更快。该结论不外推到图像或长上下文。
 5. **37/37 offload 能说明什么？** 只说明模型层按记录被 CUDA offload，不证明全部算子、端到端性能、功耗或稳定性达标。
@@ -141,15 +141,15 @@
 
 ### 最值得继续优化的方面
 
-1. VLM 质量证据：使用独立、不参与调参的小型真实设备图集，定义可观察事实、拒答和引用口径；当前合成 fixture 只能证明链路与性能。
+1. 推理状态优化：把单热 Token LCP Prefix Reuse 接入实际 Qwen2.5-VL `MtmdBackend` text-only 路径，以正确性门和 256-2048 token A/B 实测证明 Prefill/TTFT 收益。
 2. 真实 Demo：RAG 引用/拒答、单图诊断和 SSE 的 2-3 个短证据，展示价值高于新增 Web 前端。
-3. 单图性能与质量：在现有固定 fixture 阶段计时之外，增加不同分辨率输入，并建立不用于训练/调参的公开小型准确性样例。
+3. VLM 性能与质量：冻结小型真实设备图质量集后，建立分辨率/image tokens/视觉阶段延迟/事实正确率的权衡。
 4. 可复现部署：新路径或第二台 Jetson 做 clean clone + 离线 bundle 演练。
 5. C++ 测试：在可绑定 loopback 的 CI/Jetson 完整执行 service contract，并明确禁止 silent skip。
 
 ### P1/P2
 
-P1：建立小型 VLM 质量集；完成 30-60 分钟串行 soak、HTTP service 全测试、clean-clone 离线演练；增加最小 systemd unit、日志轮转和退出回收验证。除文档/systemd 草案外均需要 Jetson/资产。
+P1：按 [深入优化路线](optimization-roadmap.md) 先完成 `MtmdBackend` Prefix Reuse，再进行 Nsight decode 归因和 VLM 分辨率权衡；并行补齐小型 VLM 质量集、30-60 分钟串行 soak、HTTP service 全测试、clean-clone 离线演练、最小 systemd unit 和日志轮转。除文档/systemd 草案外均需要 Jetson/资产。
 
 P2：在明确 SLA 后设计鉴权/审计、多 session KV/调度/内存预算、持久状态和故障注入；视频/多图与真实全双工语音必须先定义 API、资源预算、数据和实机验证，不应从当前单图/半双工能力外推。
 

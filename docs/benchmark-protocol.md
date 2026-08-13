@@ -62,6 +62,8 @@ scripts/run_jetson_benchmark.sh \
 
 ## KV Prefix reuse 方法
 
+当前方法和 runner 对应 `DirectBackend` 的冻结 Qwen3 验证路径，不是 Qwen2.5-VL `MtmdBackend` 已完成的性能证据。真实 VLM Runtime 的接入、正确性门和长 prompt A/B 协议见 [深入优化路线](optimization-roadmap.md)；完成前不得把本节结果外推到 Assistant/RAG 主路径。
+
 使用 `edgeomni_qwen3_benchmark_runner --session-id ... --prompt-2 ...` 固定同一 session：
 
 - cold：第一条完整 prompt；
