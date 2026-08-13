@@ -7,7 +7,7 @@
 | 平台 | Jetson AGX Orin、ARM64、CUDA Release 构建 | 37/37 layer CUDA offload 已记录 |
 | 量化 | Q4_K_M 与 Q8_0，各 15 次有效基线测量 | Q4 为部署优先候选；Q8 为对照 |
 | KV | 文本单热 session、Token LCP、分叉/回滚与异常失效 | 仅单热 Prefix reuse，不是生产缓存 |
-| VLM | 固定 Qwen2.5-VL 主模型/MMProj、单图 API | 单图链路已验证；不宣称通用多图/视频能力 |
+| VLM | 固定 Qwen2.5-VL 主模型/MMProj、单图 API | Q4/Q8 固定单图 E2E 已验证；不宣称准确率、通用多图/视频能力 |
 | RAG | SQLite/FTS5 hybrid、引用和拒答门禁 | M9.1B R2.5 为 PARTIAL，最终质量门未通过 |
 
 性能数字只在原始环境、固定模型、功耗模式、上下文、采样和测量口径相同的前提下可比较。本仓库不把未随 clone 提供的本机日志作为运行依赖，也不将上述摘要外推为高并发、长稳、生产 SLA 或多用户结论。
@@ -18,7 +18,9 @@
 | --- | --- | --- |
 | 37/37 CUDA layer offload | clean Q4 Runtime 日志已核对，公开报告绑定其 SHA-256 | 原始长日志仍保留在 Git-ignored 本地证据目录 |
 | Q4/Q8 各 15 次基线 | 同 clean commit 锁频配对文本数值已公开 | 速度近似持平；Q4 的部署优先理由是资源效率，不外推到单图、长上下文或质量 |
+| Q4/Q8 固定单图 E2E | 同 clean commit、同图同 prompt 各 15 次数值已公开 | Q8 E2E median 低 4.44%，但统一 RAM 多 1,455.5 MB；不是质量或通用 VLM 结论 |
 | 功耗、RAM/GPU 内存、温度 | Q4/Q8 报告包含板载 rail、统一 RAM、CUDA model buffer 和温度统计 | 不是墙插功耗、独立 GPU 内存遥测或长期峰值；长稳仍待实测 |
+| 单图阶段拆分 | 结构化响应标记 `image_preprocess_ms`/`vision_encode_ms`/`image_embedding_ms` 为 `not_measured` | 零占位不按 0 ms 发布；需修复 Runtime 可观测合同后重测 |
 | 长稳与错误率 | 不足以证明 | 待定义 30-60 分钟串行 soak 并记录请求数/错误/资源趋势 |
 | 生产并发/SLA | 未实现且不足以证明 | 不应由当前单活动请求原型外推 |
 
@@ -69,3 +71,11 @@
 在同一 clean commit `7a9d40eb262ca718352a00d3f6864da86dfb0571` 和相同锁频/输入/Runtime/MMProj 参数下，Q4 与 Q8 各完成 1 次预热和 15 次有效请求。两者均为 15/15 HTTP 200、37/37 layer offload 并正常停止。
 
 Q4/Q8 decode throughput 中位数分别为 15.101/15.227 token/s，Runtime total 中位数为 8,491/8,422 ms，属于该短文本协议下的近似持平。Q8 的统一 RAM 中位数为 13,928 MB，相比 Q4 的 12,458 MB 增加 1,470 MB；CUDA model buffer 增加 1,292.78 MiB，单次 model ready 从 4,808 ms 增至 6,894 ms。因此当前选择 Q4_K_M 的公开理由是资源效率，不是宣称 Q4 速度更快。完整口径、telemetry 和 artifact hash 见 [配对报告](../benchmarks/q4-q8-paired-20260812.md)。
+
+## 2026-08-13 Q4/Q8 clean-commit 固定单图 E2E 基线
+
+在 clean commit `7415e0e6b7d1447addec2006f4540e0defb08bad` 上，Q4/Q8 使用同一 320x192 合成 PNG、prompt、MMProj、Runtime 和 MODE_30W 锁频配置，各完成 1 次预热和 15 次有效单图请求。两者均为 15/15 HTTP 200、37/37 layer offload、77 image tokens、14 output tokens，且输出文本一致。
+
+Q4/Q8 Runtime total 中位数为 1,530/1,462 ms，TTFT 为 598/537 ms；Q8 在该固定请求下 E2E 低 4.44%。但 Q8 统一 RAM 中位数为 13,800 MB，比 Q4 的 12,344.5 MB 多 1,455.5 MB，model ready 也从 4,834 ms 增至 6,719 ms。因此仍以 Q4 作为部署优先候选；该选择基于资源效率，不是否认本次 Q8 的小幅 E2E 优势。
+
+三个视觉阶段字段在结构化响应中均为 `not_measured`，对应零值不按 0 ms 解读。合成图仅用于端到端性能/链路证据，不构成诊断准确率或量化质量结论。完整口径与 artifact hash 见 [单图配对报告](../benchmarks/q4-q8-image-paired-20260813.md)。
