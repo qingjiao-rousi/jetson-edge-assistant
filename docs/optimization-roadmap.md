@@ -115,8 +115,8 @@ cancel/timeout/prefill/decode/rollback failure
 
 1. 从 text-only `mtmd_input_chunks` 取得并拼接 `llama_token`。
 2. 保存一个 hot session 的 `session_id`、prompt tokens、模型/模板/Runtime 配置 fingerprint。
-3. 计算新旧 token LCP；完全相同 prompt 回退一个 token，重新得到本次请求 logits。
-4. 使用上游 `llama_memory_seq_rm()` 删除 `[LCP, end)`，从 LCP 开始构造 text batch。
+3. 计算新旧 token LCP，并向下对齐到完整 cold-prefill batch；exact prompt 也重新计算最后一个完整或尾部 cold batch，保持产生 logits 的 batch 形状。
+4. 使用上游 `llama_memory_seq_rm()` 删除 `[aligned LCP, end)`，从对齐后的 LCP 开始构造 text batch。
 5. 成功生成后删除 `[prompt_tokens, end)`，保留完整 prompt KV。
 6. 将所有异常路径汇入统一 `clear_hot(reason)`；同步 llama context 后再修改 memory。
 7. 图片请求无条件标记 `image_request` 并清空；第一阶段不复用图像 embedding。
@@ -132,6 +132,26 @@ cancel/timeout/prefill/decode/rollback failure
 - disabled 模式维持 `d11617e` cold 行为，不产生隐式缓存。
 
 任何一项未通过时不得进入正式性能报告。
+
+真实 Runtime 的失效矩阵由 `scripts/validate_mtmd_prefix_reuse.py` 执行。它在独立 disabled/hot Runtime 进程间比较 cold/exact/branch 输出，并在 hot Runtime 内验证 session switch、单图请求、timeout、HTTP cancel 和 `POST /v1/context/reset` 后下一文本请求为 cold。该 reset 路由只允许服务空闲时调用；它是实验和运维诊断接口，不是多用户会话 API。
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+source = Path('/tmp/edgeomni-opt1/p256.txt').read_text(encoding='utf-8')
+Path('/tmp/edgeomni-opt1/t709-branch.txt').write_text(
+    source + ' Branch-specific final instruction: state only the observed alarm.', encoding='utf-8')
+PY
+
+sudo jetson_clocks
+sudo -v
+python3 scripts/validate_mtmd_prefix_reuse.py \
+  --prompt-file /tmp/edgeomni-opt1/p256.txt \
+  --branch-prompt-file /tmp/edgeomni-opt1/t709-branch.txt \
+  --output benchmarks/results/opt1-t709-correctness.json
+```
+
+`PASS` 只说明这一次 Runtime correctness matrix 通过。输出 JSON 是 local raw evidence，仍需绑定 clean commit、模型 hash 和运行日志后才能支持对外声明。
 
 ### 性能协议
 

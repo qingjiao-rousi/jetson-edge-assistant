@@ -171,6 +171,14 @@ RuntimeService::RuntimeService(std::shared_ptr<RuntimeBackend> backend) : impl_(
     s.Get("/ready", [this](const httplib::Request &, httplib::Response & res) { if (!ready()) res.status = 503; res.set_content(json({{"ready", ready()}}).dump(), "application/json"); });
     s.Get("/model/info", [this](const httplib::Request &, httplib::Response & res) { std::lock_guard<std::mutex> l(impl_->mutex); res.set_content(json({{"model_name", impl_->config.model_name}, {"model_sha256", impl_->config.model_sha256}, {"template_fingerprint", impl_->config.template_fingerprint}, {"context_capacity", impl_->config.context_capacity}}).dump(), "application/json"); });
     s.Get("/metrics", [this](const httplib::Request &, httplib::Response & res) { std::lock_guard<std::mutex> l(impl_->mutex); auto m = json({{"accepted", impl_->accepted.load()}, {"completed", impl_->completed.load()}, {"cancelled", impl_->cancelled.load()}, {"timeout", impl_->timed_out.load()}, {"errors", impl_->errors.load()}, {"active", impl_->active.empty() ? 0 : 1}, {"queue_depth", 0}, {"token_count", impl_->token_count.load()}, {"completed_request_ids", impl_->completed_request_id_order.size()}, {"completed_request_id_capacity", kCompletedRequestIdCapacity}, {"service_ttft_ms", impl_->last_service_ttft_ms}, {"service_tpot_ms", impl_->last_service_tpot_ms}, {"last", metrics_json(impl_->last_metrics)}}); res.set_content(m.dump(), "application/json"); });
+    s.Post("/v1/context/reset", [this](const httplib::Request &, httplib::Response & res) {
+        std::lock_guard<std::mutex> lock(impl_->mutex);
+        if (!impl_->initialized || impl_->stopping) { error_response(res, 503, "unavailable", "service is not ready"); return; }
+        if (!impl_->active.empty()) { error_response(res, 409, "busy", "cannot reset an active context"); return; }
+        const Status status = impl_->backend->reset_context();
+        if (!status.ok()) { error_response(res, http_code(status.code), code_name(status.code), status.message); return; }
+        res.set_content(R"({"reset":true})", "application/json");
+    });
     s.Post(R"(/v1/cancel/(.*))", [this](const httplib::Request & req, httplib::Response & res) { const std::string id = req.matches.size() > 1 ? req.matches[1].str() : ""; const Status st = impl_->backend->cancel_request(id); if (!st.ok()) { res.status = 404; } else { res.set_content(json({{"request_id", id}, {"cancelled", true}}).dump(), "application/json"); } });
     auto handler = [this](const httplib::Request & req, httplib::Response & res, bool application_diagnosis_route) {
         json body; try { body = json::parse(req.body); } catch (...) { res.status = 400; res.set_content(R"({"error":{"code":"invalid_json","message":"invalid JSON"}})", "application/json"); return; }
