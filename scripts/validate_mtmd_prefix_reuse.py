@@ -13,6 +13,7 @@ import json
 import pathlib
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -72,25 +73,42 @@ class RuntimeProcess:
     def __init__(self, config: dict[str, Any]):
         self.config = config
         self.process: subprocess.Popen[bytes] | None = None
+        self.log_path: pathlib.Path | None = None
+        self.log_file: Any = None
+
+    def _stop(self) -> None:
+        stop_process(self.process)
+        self.process = None
+        if self.log_file is not None:
+            self.log_file.close()
+            self.log_file = None
 
     def __enter__(self) -> "RuntimeProcess":
         runtime = self.config["runtime"]
         check_port_available(runtime["host"], runtime["port"])
-        self.process = subprocess.Popen(runtime_command(self.config), cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        descriptor, raw_path = tempfile.mkstemp(prefix="edgeomni-prefix-validation-", suffix=".log")
+        self.log_path = pathlib.Path(raw_path)
+        self.log_file = open(descriptor, "wb", closefd=True)
+        self.process = subprocess.Popen(runtime_command(self.config), cwd=ROOT, stdout=self.log_file, stderr=subprocess.STDOUT)
         deadline = time.monotonic() + 180
         while time.monotonic() < deadline:
             if self.process.poll() is not None:
-                detail = self.process.stdout.read().decode("utf-8", errors="replace") if self.process.stdout else ""
-                raise ValidationError(f"Runtime exited before /ready ({self.process.returncode}): {detail[-1000:]}")
+                returncode = self.process.returncode
+                self.log_file.flush()
+                detail = self.log_path.read_text(encoding="utf-8", errors="replace")[-1000:]
+                self._stop()
+                raise ValidationError(f"Runtime exited before /ready ({returncode}): {detail}")
             try:
                 check_runtime(self.config)
                 return self
             except Exception:
                 time.sleep(0.2)
-        raise ValidationError("Runtime did not become ready within 180 seconds")
+        log_path = self.log_path
+        self._stop()
+        raise ValidationError(f"Runtime did not become ready within 180 seconds; inspect {log_path}")
 
     def __exit__(self, *_: object) -> None:
-        stop_process(self.process)
+        self._stop()
 
 
 def require(condition: bool, name: str, detail: str = "") -> dict[str, Any]:
