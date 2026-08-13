@@ -75,15 +75,21 @@ def summarize_rows(rows: list[dict]) -> dict:
         if len(image_hashes) != 1 or not image_hashes[0]:
             raise ValueError("single-image rows must bind one image SHA-256")
         validity["image_sha256_values"] = image_hashes
-        validity["measurement_status_values"] = sorted({
-            json.dumps(row.get("measurement_status"), sort_keys=True) for row in rows
-        })
-        metrics.update({
-            "image_preprocess_ms": metric(rows, lambda row: row["metrics"]["image_preprocess_ms"]),
-            "vision_encode_ms": metric(rows, lambda row: row["metrics"]["vision_encode_ms"]),
-            "image_embedding_ms": metric(rows, lambda row: row["metrics"]["image_embedding_ms"]),
-            "image_tokens": metric(rows, lambda row: row["image_tokens"]),
-        })
+        measurement_keys = ("image_preprocess_ms", "vision_encode_ms", "image_embedding_ms")
+        status_values = {
+            key: sorted({row.get("measurement_status", {}).get(key, "missing") for row in rows})
+            for key in measurement_keys
+        }
+        validity["measurement_status"] = status_values
+        unavailable = {}
+        for key in measurement_keys:
+            if status_values[key] == ["measured"]:
+                metrics[key] = metric(rows, lambda row, metric_key=key: row["metrics"][metric_key])
+            else:
+                unavailable[key] = status_values[key]
+        if unavailable:
+            validity["unavailable_metrics"] = unavailable
+        metrics["image_tokens"] = metric(rows, lambda row: row["image_tokens"])
     return {"schema_version": 1, "validity": validity, "metrics": metrics}
 
 
