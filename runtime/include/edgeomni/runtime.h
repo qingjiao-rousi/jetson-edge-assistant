@@ -71,6 +71,11 @@ struct SamplingConfig {
     float temperature = 0.0F;
 };
 
+enum class PrefixReuseMode {
+    kDisabled,
+    kSingleHotText,
+};
+
 struct ImageInput {
     std::string id;
     std::vector<uint8_t> encoded_bytes;
@@ -95,6 +100,7 @@ struct RuntimeConfig {
     int32_t batch_threads = 8;
     bool use_mmap = true;
     bool flash_attention = true;
+    PrefixReuseMode prefix_reuse_mode = PrefixReuseMode::kDisabled;
     uint64_t max_image_bytes = 10U * 1024U * 1024U;
     uint32_t max_image_width = 4096;
     uint32_t max_image_height = 4096;

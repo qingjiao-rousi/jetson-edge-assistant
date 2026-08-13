@@ -2,7 +2,7 @@
 
 最后更新：2026-08-13  
 公开作品集基线：`d11617e` (`docs(benchmark): publish paired VLM stage timings`)  
-当前阶段：**基线已冻结，深入优化尚未开始**
+当前阶段：**OPT-1 已实现，等待 Jetson 正确性与性能验证**
 
 本文是基线之后性能优化工作的唯一状态源。`README.md` 只展示摘要，`ROADMAP.md` 只保留里程碑。每次实验更新本页的状态、证据和决策记录，不用未审核结果覆盖既有 reviewed baseline。
 
@@ -28,7 +28,7 @@
 | Jetson 短时性能证据 | **完成** | Q4/Q8 文本、固定单图 E2E/阶段计时和资源遥测 | 不代表长稳、墙插功耗、质量或生产尾延迟 |
 | RAG/VLM 质量 | **部分完成** | 引用/拒答合同；RAG R2.5 明确为 PARTIAL | 新独立 RAG eval、真实 VLM 小型质量集 |
 | 部署运维 | **部分完成** | 原生离线构建/启动/校验流程 | clean-clone 演练、无 skip HTTP CTest、systemd、日志轮转、soak |
-| 深入性能优化 | **尚未开始** | 已有可比较基线和结构化指标 | 下述 OPT-1 至 OPT-4 |
+| 深入性能优化 | **OPT-1 实现完成，未实测** | 本地编译、FakeBackend 策略测试、显式启动配置 | Jetson 真实 MtmdBackend correctness 和 A/B 数据 |
 | 生产化 | **未实现且非当前目标** | 无 | 鉴权、审计、多用户调度、故障注入、生产 SLA |
 
 不使用一个笼统百分比描述整个项目，因为“作品集完整度”和“生产完整度”不是同一分母。当前可以准确表述为：**作品集 P0 和声明范围内的核心原型已完成；质量、长稳和生产化仍未完成。**
@@ -49,7 +49,7 @@
 
 | ID | 优化线 | 当前状态 | 主指标 | 招聘价值 | 进入条件 |
 | --- | --- | --- | --- | --- | --- |
-| OPT-1 | 真实 `MtmdBackend` Prefix Reuse | **PLANNED** | Prefill、TTFT、hit tokens | 最高：Runtime 状态管理与正确性 | 先执行 |
+| OPT-1 | 真实 `MtmdBackend` Prefix Reuse | **IN_PROGRESS** | Prefill、TTFT、hit tokens | 最高：Runtime 状态管理与正确性 | Jetson 验证 |
 | OPT-2 | Nsight 驱动 decode 优化 | **PLANNED** | token/s、TPOT、GPU timeline | 高，但最终提速不确定 | OPT-1 数据稳定后 |
 | OPT-3 | 多分辨率 VLM 权衡 | **PLANNED** | image tokens、vision latency、质量 | 中高：端侧视觉资源策略 | 先冻结质量集 |
 | OPT-4 | RAG/HTTP/图片解码小开销 | **MEASURE FIRST** | 分阶段延迟、占比 | 中；只优化已证明瓶颈 | profiling 显示值得做 |
@@ -65,6 +65,30 @@
 第一阶段不整合 Agent/RAG session，不实现多 session、LRU/TTL、跨进程持久化或图像 KV reuse。先通过专用 Runtime workload 证明机制和收益；通过整合门后再设计 Agent session 到 Runtime session 的映射。
 
 ### 设计
+
+当前实现已落在 `runtime/src/mtmd_backend.cpp`，由 `RuntimeConfig.prefix_reuse_mode` 控制；默认值和现有公开配置均为 `disabled`。`single_hot_text` 只通过显式配置启用，尚未证明任何实际降幅。
+
+本地检查入口：
+
+```bash
+cmake -S . -B build-runtime -DEDGEOMNI_BUILD_TESTS=ON -DEDGEOMNI_BUILD_INTEGRATION=OFF
+cmake --build build-runtime -j"$(nproc)"
+ctest --test-dir build-runtime --output-on-failure
+python3 -m unittest discover -s tests/unit -p 'test_*.py'
+```
+
+Jetson 实测入口（需模型、MMProj 和已构建 Runtime）：
+
+```bash
+scripts/run_jetson_benchmark.sh --config configs/assistant.json \
+  --label opt1-q4-disabled --repeats 30 --max-new-tokens 128
+scripts/run_jetson_benchmark.sh --config configs/assistant-prefix-single-hot.json \
+  --label opt1-q4-single-hot --repeats 30 --max-new-tokens 128
+```
+
+文本 benchmark 使用固定的 `benchmark-prefix-session` 发送连续请求，才能测到同一 hot session 的 LCP；单图 benchmark 仍使用独立诊断请求，不复用视觉 KV。
+
+上述命令只产生 raw evidence；在复制 protocol 字段、检查 cold/hot 输出一致性和缓存失效场景前，结果必须保持 `UNREVIEWED`。真实 `MtmdBackend` 的 correctness、Prefill/TTFT 收益、RAM 峰值和长稳状态均为**待实测**。
 
 实验配置应提供 `disabled` 与 `single_hot_text` 两种模式，使 A/B 使用同一代码和二进制，仅改变显式配置。
 
@@ -175,7 +199,7 @@ experiment/vlm-token-budget  # OPT-3
 | 日期 | 决策 | 状态/证据 |
 | --- | --- | --- |
 | 2026-08-13 | 冻结 `d11617e` 为公开作品集基线；不把它称为生产版本 | 已有 reviewed 文本/单图报告，main clean |
-| 2026-08-13 | 第一深入方向选择真实 `MtmdBackend` text-only Prefix Reuse | PLANNED；尚无实现或性能数字 |
+| 2026-08-13 | 第一深入方向选择真实 `MtmdBackend` text-only Prefix Reuse | 已实现；真实模型/Jetson 验证待完成 |
+| 2026-08-13 | 在实验分支实现显式 `disabled/single_hot_text` 配置、mtmd 文本 token LCP、KV 回滚和失效策略 | 本地 CMake/CTest 通过；真实模型/Jetson 验证待完成 |
 | 2026-08-13 | Agent/RAG session 映射暂不整合，先用专用 Runtime workload 验证 | 避免同时改变 Runtime 与应用生命周期 |
 | 2026-08-13 | Nsight、多分辨率和小开销优化排在 OPT-1 之后 | 避免多变量和错误归因 |
-

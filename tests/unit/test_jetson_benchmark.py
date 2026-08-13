@@ -39,6 +39,7 @@ EMC MinFreq=3199000000 MaxFreq=3199000000 CurrentFreq=3199000000 FreqOverride=1
     def test_request_is_deterministic_and_bound_to_configured_model(self):
         config = {"runtime": {"model": {"sha256": "a" * 64}}}
         request = MODULE.runtime_request(config, "request-1", "prompt", 32)
+        self.assertEqual(request["session_id"], "benchmark-prefix-session")
         self.assertEqual(request["model_sha256"], "a" * 64)
         self.assertEqual(request["sampling"], {
             "seed": 424242, "top_k": 1, "top_p": 1.0, "min_p": 0.0, "temperature": 0.0,

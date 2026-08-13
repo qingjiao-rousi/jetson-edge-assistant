@@ -43,6 +43,7 @@ Status FakeBackend::initialize(const RuntimeConfig & config) {
     generate_call_count_ = 0;
     hot_session_id_.clear();
     hot_prompt_tokens_.clear();
+    prefix_reuse_mode_ = config.prefix_reuse_mode;
     return Status::Ok();
 }
 
@@ -83,13 +84,16 @@ GenerateResponse FakeBackend::generate_text(const GenerateRequest & request, con
             response.metrics.vision_encode_measured = true;
             response.metrics.image_embedding_ms = 0;
             response.metrics.image_embedding_measured = true;
+        } else if (prefix_reuse_mode_ == PrefixReuseMode::kDisabled) {
+            hot_session_id_.clear(); hot_prompt_tokens_.clear();
+            response.metrics.cache_invalidation_reason = "disabled";
         } else if (request.session_id.empty()) {
             response.metrics.cache_invalidation_reason = "no_session_id";
         } else if (!hot_session_id_.empty() && hot_session_id_ != request.session_id) {
             hot_session_id_.clear(); hot_prompt_tokens_.clear();
             response.metrics.cache_invalidation_reason = "session_id_changed";
         }
-        size_t hit = request.session_id == hot_session_id_ ? common_prefix(hot_prompt_tokens_, prompt_tokens) : 0U;
+        size_t hit = prefix_reuse_mode_ == PrefixReuseMode::kSingleHotText && request.session_id == hot_session_id_ ? common_prefix(hot_prompt_tokens_, prompt_tokens) : 0U;
         // A valid next-token distribution always requires the final prompt token to be decoded again.
         if (hit == prompt_tokens.size() && hit > 0U) --hit;
         response.metrics.cache_hit_tokens = static_cast<uint32_t>(hit);
@@ -137,7 +141,7 @@ GenerateResponse FakeBackend::generate_text(const GenerateRequest & request, con
         if (response.code == RuntimeErrorCode::kOk) {
             response.finish_reason = "stop";
             std::lock_guard<std::mutex> lock(mutex_);
-            if (!request.session_id.empty() && request.images.empty()) {
+            if (prefix_reuse_mode_ == PrefixReuseMode::kSingleHotText && !request.session_id.empty() && request.images.empty()) {
                 hot_session_id_ = request.session_id;
                 hot_prompt_tokens_ = fake_prompt_tokens(request);
             }

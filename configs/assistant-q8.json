@@ -21,7 +21,8 @@
     "context_tokens": 8192,
     "batch_tokens": 512,
     "ubatch_tokens": 512,
-    "gpu_layers": 99
+    "gpu_layers": 99,
+    "prefix_reuse": "disabled"
   },
   "rag": {
     "database": "generated/rag-m9.1b-r2.2/hybrid.sqlite3"

@@ -23,6 +23,7 @@ edgeomni::RuntimeConfig fake_config() {
     edgeomni::RuntimeConfig config;
     config.model_path = __FILE__;
     config.expected_model_sha256 = "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5";
+    config.prefix_reuse_mode = edgeomni::PrefixReuseMode::kSingleHotText;
     return config;
 }
 
@@ -186,6 +187,22 @@ void test_fake_backend() {
     config.expected_model_sha256 = "bad";
     expect(wrong_hash.initialize(config).code == edgeomni::RuntimeErrorCode::kModelHashMismatch,
            "FakeBackend reports model hash mismatch");
+
+    edgeomni::FakeBackend disabled;
+    config = fake_config();
+    config.prefix_reuse_mode = edgeomni::PrefixReuseMode::kDisabled;
+    expect(disabled.initialize(config).ok(), "disabled Prefix Reuse config initializes");
+    edgeomni::GenerateRequest disabled_request;
+    disabled_request.request_id = "disabled-cold";
+    disabled_request.session_id = "same";
+    disabled_request.messages = {{"user", "same prompt"}};
+    expect(disabled.generate_text(disabled_request).metrics.cache_hit_tokens == 0U,
+           "disabled Prefix Reuse never reports a cache hit");
+    disabled_request.request_id = "disabled-second";
+    const auto disabled_second = disabled.generate_text(disabled_request);
+    expect(disabled_second.metrics.cache_hit_tokens == 0U && !disabled_second.metrics.cache_reused,
+           "disabled Prefix Reuse does not retain hot KV state");
+    expect(disabled.shutdown().ok(), "disabled FakeBackend shuts down");
 }
 
 }  // namespace

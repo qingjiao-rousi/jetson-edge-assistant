@@ -116,6 +116,10 @@ def runtime_request(config: dict[str, Any], request_id: str, prompt: str, max_ne
     runtime = config["runtime"]
     return {
         "request_id": request_id,
+        # A single deterministic session lets the OPT-1 experiment exercise
+        # the Runtime's one-hot text KV policy. Image workloads intentionally
+        # use the separate diagnosis contract and do not carry this key.
+        "session_id": "benchmark-prefix-session",
         "messages": [{"role": "user", "content": prompt}],
         "max_new_tokens": max_new_tokens,
         "timeout_ms": 120000,

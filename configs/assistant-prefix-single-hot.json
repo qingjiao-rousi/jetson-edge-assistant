@@ -22,14 +22,12 @@
     "batch_tokens": 512,
     "ubatch_tokens": 512,
     "gpu_layers": 99,
-    "prefix_reuse": "disabled"
+    "prefix_reuse": "single_hot_text"
   },
-  "rag": {
-    "database": "generated/rag-m9.1b-r2.2/hybrid.sqlite3"
-  },
+  "rag": {"database": "generated/rag-m9.1b-r2.2/hybrid.sqlite3"},
   "modules": {
     "manual_qa_config": "configs/manual-qa.json",
     "voice_gateway_config": "configs/voice-gateway.json"
   },
-  "agent_command": ["python3", "scripts/run_agent.py", "--jsonl", "--config", "configs/assistant.json"]
+  "agent_command": ["python3", "scripts/run_agent.py", "--jsonl", "--config", "configs/assistant-prefix-single-hot.json"]
 }

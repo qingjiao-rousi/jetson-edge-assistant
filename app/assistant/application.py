@@ -67,7 +67,7 @@ def load_config(path: str | pathlib.Path = "configs/assistant.json") -> dict:
     manual_path = repo_path(modules["manual_qa_config"])
     voice_path = repo_path(modules["voice_gateway_config"])
     runtime = config["runtime"]
-    runtime_keys = {"base_url", "ready_endpoint", "chat_endpoint", "host", "port", "executable", "model", "mmproj", "context_tokens", "batch_tokens", "ubatch_tokens", "gpu_layers"}
+    runtime_keys = {"base_url", "ready_endpoint", "chat_endpoint", "host", "port", "executable", "model", "mmproj", "context_tokens", "batch_tokens", "ubatch_tokens", "gpu_layers", "prefix_reuse"}
     if not isinstance(runtime, dict) or set(runtime) != runtime_keys:
         raise AssistantConfigError("runtime has an invalid launch contract")
     base, ready, chat = runtime.get("base_url"), runtime.get("ready_endpoint"), runtime.get("chat_endpoint")
@@ -97,6 +97,8 @@ def load_config(path: str | pathlib.Path = "configs/assistant.json") -> dict:
             raise AssistantConfigError(f"runtime.{name}.path must be repository-relative")
     if not all(isinstance(runtime[key], int) and runtime[key] > 0 for key in ("context_tokens", "batch_tokens", "ubatch_tokens", "gpu_layers")):
         raise AssistantConfigError("runtime numeric settings must be positive integers")
+    if runtime["prefix_reuse"] not in {"disabled", "single_hot_text"}:
+        raise AssistantConfigError("runtime.prefix_reuse must be disabled or single_hot_text")
     rag = config["rag"]
     if not isinstance(rag, dict) or set(rag) != {"database"} or not isinstance(rag["database"], str):
         raise AssistantConfigError("rag must contain the shared database path")
