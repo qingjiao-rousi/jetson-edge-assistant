@@ -128,6 +128,11 @@ int main_test() {
                "diagnosis SSE is metadata then tokens then done");
         expect(body.find("event: done", done + 1) == std::string::npos, "diagnosis SSE terminal is unique");
         expect(body.find("iVBORw0KGgo") == std::string::npos, "diagnosis response does not leak base64");
+        expect(body.find("\"image_preprocess_ms\":\"measured\"") != std::string::npos,
+               "zero-millisecond image preprocessing remains explicitly measured");
+        expect(body.find("\"vision_encode_ms\":\"measured\"") != std::string::npos &&
+                   body.find("\"image_embedding_ms\":\"measured\"") != std::string::npos,
+               "zero-millisecond vision stages remain explicitly measured");
     }
     expect(backend->generate_call_count() == before_diagnosis + 1U, "diagnosis invokes FakeBackend exactly once");
     const auto captured = backend->last_request();

@@ -141,6 +141,7 @@ GenerateResponse MtmdBackend::generate_text(const GenerateRequest & request, con
         const auto decode_started = std::chrono::steady_clock::now();
         bitmap.reset(mtmd_helper_bitmap_init_from_buf(impl_->vision.get(), image.encoded_bytes.data(), image.encoded_bytes.size()));
         response.metrics.image_preprocess_ms = elapsed_ms(decode_started);
+        response.metrics.image_preprocess_measured = true;
         if (!bitmap || mtmd_bitmap_is_audio(bitmap.get())) { response.code = RuntimeErrorCode::kImageDecodeFailed; response.finish_reason = "error"; response.error_message = "mtmd failed to decode image bytes"; return response; }
         const Status status = validate_image_input(image, {mtmd_bitmap_get_nx(bitmap.get()), mtmd_bitmap_get_ny(bitmap.get())},
                                                    {impl_->config.max_image_bytes, impl_->config.max_image_width, impl_->config.max_image_height, impl_->config.max_image_pixels});
@@ -168,7 +169,30 @@ GenerateResponse MtmdBackend::generate_text(const GenerateRequest & request, con
     for (size_t i = 0; i < mtmd_input_chunks_size(chunks.get()); ++i) { const auto * chunk = mtmd_input_chunks_get(chunks.get(), i); if (mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_IMAGE) response.image_tokens += static_cast<uint32_t>(mtmd_image_tokens_get_n_tokens(mtmd_input_chunk_get_tokens_image(chunk))); }
     if (prompt_tokens + request.max_new_tokens > llama_n_ctx(impl_->context.get())) { response.code = RuntimeErrorCode::kContextLimit; response.finish_reason = "error"; response.error_message = "prompt plus requested generation exceeds context"; return response; }
     const auto prefill_started = std::chrono::steady_clock::now(); llama_pos n_past = 0;
-    const int eval = mtmd_helper_eval_chunks(impl_->vision.get(), impl_->context.get(), chunks.get(), 0, 0, static_cast<int>(impl_->config.batch_tokens), true, &n_past);
+    int eval = 0;
+    const size_t chunk_count = mtmd_input_chunks_size(chunks.get());
+    for (size_t index = 0; index < chunk_count && eval == 0; ++index) {
+        const mtmd_input_chunk * chunk = mtmd_input_chunks_get(chunks.get(), index);
+        const bool logits_last = index + 1U == chunk_count;
+        if (mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_IMAGE) {
+            const auto vision_started = std::chrono::steady_clock::now();
+            eval = mtmd_encode_chunk(impl_->vision.get(), chunk);
+            response.metrics.vision_encode_ms += elapsed_ms(vision_started);
+            response.metrics.vision_encode_measured = true;
+            if (eval != 0) break;
+            const auto embedding_started = std::chrono::steady_clock::now();
+            eval = mtmd_helper_decode_image_chunk(
+                impl_->vision.get(), impl_->context.get(), chunk,
+                mtmd_get_output_embd(impl_->vision.get()), n_past, 0,
+                static_cast<int>(impl_->config.batch_tokens), &n_past);
+            response.metrics.image_embedding_ms += elapsed_ms(embedding_started);
+            response.metrics.image_embedding_measured = true;
+        } else {
+            eval = mtmd_helper_eval_chunk_single(
+                impl_->vision.get(), impl_->context.get(), chunk, n_past, 0,
+                static_cast<int>(impl_->config.batch_tokens), logits_last, &n_past);
+        }
+    }
     response.metrics.prefill_ms = elapsed_ms(prefill_started);
     if (eval != 0) { if (stop()) { response.metrics.total_ms = elapsed_ms(started); return response; } response.code = RuntimeErrorCode::kVisionEncodeFailed; response.finish_reason = "error"; response.error_message = "mtmd vision encode or prompt evaluation failed"; response.metrics.total_ms = elapsed_ms(started); return response; }
     response.prompt_tokens = static_cast<uint32_t>(prompt_tokens); response.metrics.prompt_tokens = response.prompt_tokens;

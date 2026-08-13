@@ -75,6 +75,14 @@ GenerateResponse FakeBackend::generate_text(const GenerateRequest & request, con
         if (!request.images.empty()) {
             hot_session_id_.clear(); hot_prompt_tokens_.clear();
             response.metrics.cache_invalidation_reason = "image_request";
+            // Exercise the service contract where a valid measured duration
+            // rounds down to zero milliseconds.
+            response.metrics.image_preprocess_ms = 0;
+            response.metrics.image_preprocess_measured = true;
+            response.metrics.vision_encode_ms = 0;
+            response.metrics.vision_encode_measured = true;
+            response.metrics.image_embedding_ms = 0;
+            response.metrics.image_embedding_measured = true;
         } else if (request.session_id.empty()) {
             response.metrics.cache_invalidation_reason = "no_session_id";
         } else if (!hot_session_id_.empty() && hot_session_id_ != request.session_id) {

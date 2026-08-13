@@ -129,6 +129,11 @@ struct RuntimeMetrics {
     uint64_t image_preprocess_ms = 0;
     uint64_t vision_encode_ms = 0;
     uint64_t image_embedding_ms = 0;
+    // Measurement availability is independent of the integer duration: a
+    // valid sub-millisecond sample may round down to zero.
+    bool image_preprocess_measured = false;
+    bool vision_encode_measured = false;
+    bool image_embedding_measured = false;
     uint64_t decode_ms = 0;
     uint64_t total_ms = 0;
     uint64_t first_token_ms = 0;

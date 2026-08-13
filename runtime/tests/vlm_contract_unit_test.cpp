@@ -131,6 +131,20 @@ void test_text_backends() {
     text_request.messages = {{"user", "hello"}};
     expect(fake.generate_text(text_request).code == edgeomni::RuntimeErrorCode::kOk,
            "FakeBackend text generation remains compatible");
+    edgeomni::GenerateRequest image_request_fake = text_request;
+    image_request_fake.request_id = "fake-image";
+    image_request_fake.images = {image()};
+    const auto image_response = fake.generate_text(image_request_fake);
+    expect(image_response.code == edgeomni::RuntimeErrorCode::kOk,
+           "FakeBackend image generation remains compatible");
+    expect(image_response.metrics.image_preprocess_measured &&
+               image_response.metrics.vision_encode_measured &&
+               image_response.metrics.image_embedding_measured,
+           "image metric availability is explicit even when durations round to zero");
+    expect(image_response.metrics.image_preprocess_ms == 0U &&
+               image_response.metrics.vision_encode_ms == 0U &&
+               image_response.metrics.image_embedding_ms == 0U,
+           "zero durations do not imply unavailable image metrics");
     expect(fake.shutdown().ok(), "FakeBackend shutdown remains compatible");
 }
 

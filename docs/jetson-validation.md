@@ -20,7 +20,7 @@
 | Q4/Q8 各 15 次基线 | 同 clean commit 锁频配对文本数值已公开 | 速度近似持平；Q4 的部署优先理由是资源效率，不外推到单图、长上下文或质量 |
 | Q4/Q8 固定单图 E2E | 同 clean commit、同图同 prompt 各 15 次数值已公开 | Q8 E2E median 低 4.44%，但统一 RAM 多 1,455.5 MB；不是质量或通用 VLM 结论 |
 | 功耗、RAM/GPU 内存、温度 | Q4/Q8 报告包含板载 rail、统一 RAM、CUDA model buffer 和温度统计 | 不是墙插功耗、独立 GPU 内存遥测或长期峰值；长稳仍待实测 |
-| 单图阶段拆分 | 结构化响应标记 `image_preprocess_ms`/`vision_encode_ms`/`image_embedding_ms` 为 `not_measured` | 零占位不按 0 ms 发布；需修复 Runtime 可观测合同后重测 |
+| 单图阶段拆分 | 旧 reviewed commit 的结构化响应为 `not_measured`；当前代码已增加显式 measured 状态并拆分 mtmd 阶段 | 编译与模型无关合同已通过；待 clean-commit Jetson Q4/Q8 重测后才发布数值 |
 | 长稳与错误率 | 不足以证明 | 待定义 30-60 分钟串行 soak 并记录请求数/错误/资源趋势 |
 | 生产并发/SLA | 未实现且不足以证明 | 不应由当前单活动请求原型外推 |
 

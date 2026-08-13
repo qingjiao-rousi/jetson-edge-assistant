@@ -102,9 +102,9 @@
 ### 评分与定位
 
 - 当前评分：**8.8/10**。
-- 是否适合作为主项目：**适合端侧 AI 部署/C++ Runtime/Jetson 岗位的主项目**。当前已有同 commit Q4/Q8 配对文本与固定单图 E2E 结果；投递前最值得补的是 2-3 个真实 Demo 截图/GIF、视觉阶段结构化计时和长稳记录。
+- 是否适合作为主项目：**适合端侧 AI 部署/C++ Runtime/Jetson 岗位的主项目**。当前已有同 commit Q4/Q8 配对文本与固定单图 E2E 结果，视觉阶段拆分代码也已实现；投递前最值得补的是 2-3 个真实 Demo 截图/GIF、阶段拆分的 clean-commit Jetson 重测和长稳记录。
 - 主要加分：C++ Runtime 并非薄命令包装；HTTP/SSE/取消超时、单热 KV 状态、资产合同、RAG/Agent 门禁和测试都有代码证据。
-- 主要扣分：单图阶段拆分/准确率/长稳仍缺公开证据、RAG PARTIAL、HTTP 测试本环境 skip、clean-clone+离线包未独立演练。
+- 主要扣分：单图阶段拆分尚未实机重测，准确率/长稳仍缺公开证据、RAG PARTIAL、HTTP 测试本环境 skip、clean-clone+离线包未独立演练。
 
 推荐 GitHub 标题：**EdgeOmni: Offline Multimodal RAG Assistant on Jetson AGX Orin**
 
@@ -140,7 +140,7 @@
 
 ### 最值得继续优化的方面
 
-1. 单图可观测性：修复 0 ms/未测量语义，将预处理、vision encode 和 image embedding 接入结构化指标后重测。
+1. 单图可观测性：当前代码已修复 0 ms/未测量语义并接入三阶段指标；提交后在 Jetson 上按同协议重测。
 2. 真实 Demo：RAG 引用/拒答、单图诊断和 SSE 的 2-3 个短证据，展示价值高于新增 Web 前端。
 3. 单图性能与质量：分开测量固定 fixture 的视觉阶段延迟，并建立不用于训练/调参的公开小型准确性样例。
 4. 可复现部署：新路径或第二台 Jetson 做 clean clone + 离线 bundle 演练。
@@ -148,7 +148,7 @@
 
 ### P1/P2
 
-P1：修复单图视觉阶段结构化计时，并在 Jetson 上重测；完成 30-60 分钟串行 soak、HTTP service 全测试、clean-clone 离线演练；增加最小 systemd unit、日志轮转和退出回收验证。除文档/systemd 草案外均需要 Jetson/资产。
+P1：提交单图视觉阶段结构化计时实现，并在 Jetson 上重测；完成 30-60 分钟串行 soak、HTTP service 全测试、clean-clone 离线演练；增加最小 systemd unit、日志轮转和退出回收验证。除文档/systemd 草案外均需要 Jetson/资产。
 
 P2：在明确 SLA 后设计鉴权/审计、多 session KV/调度/内存预算、持久状态和故障注入；视频/多图与真实全双工语音必须先定义 API、资源预算、数据和实机验证，不应从当前单图/半双工能力外推。
 
@@ -156,4 +156,4 @@ P2：在明确 SLA 后设计鉴权/审计、多 session KV/调度/内存预算�
 
 已具备：101 项模型无关 Python 测试、C++ FakeBackend 测试代码、离线资产合同、固定 submodule、合成手册/图片 fixture、同 commit Q4/Q8 `ready -> requests -> stopped` 配对文本与固定单图 E2E 基线、37/37 layer offload、公开验证入口、benchmark 协议和 Demo 规范。
 
-待补：单图视觉阶段结构化计时与准确率、真实 Jetson CTest 无 skip、RAG 引用/拒答截图、单图 GIF/SSE 记录、clean-clone 离线交付记录、30-60 分钟 soak、systemd 运维证据。Q4/Q8 文本与固定单图 E2E 已有统一 RAM/温度/板载 rail；墙插功耗、生产 SLA、准确率和高并发目前不足以证明。
+待补：单图视觉阶段的 clean-commit Jetson 重测与准确率、真实 Jetson CTest 无 skip、RAG 引用/拒答截图、单图 GIF/SSE 记录、clean-clone 离线交付记录、30-60 分钟 soak、systemd 运维证据。Q4/Q8 文本与固定单图 E2E 已有统一 RAM/温度/板载 rail；墙插功耗、生产 SLA、准确率和高并发目前不足以证明。

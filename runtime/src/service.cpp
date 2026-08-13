@@ -54,9 +54,9 @@ json metrics_json(const RuntimeMetrics & m) {
 }
 
 json measurement_status(const RuntimeMetrics & m) {
-    return {{"image_preprocess_ms", m.image_preprocess_ms ? "measured" : "not_measured"},
-            {"vision_encode_ms", m.vision_encode_ms ? "measured" : "not_measured"},
-            {"image_embedding_ms", m.image_embedding_ms ? "measured" : "not_measured"}};
+    return {{"image_preprocess_ms", m.image_preprocess_measured ? "measured" : "not_measured"},
+            {"vision_encode_ms", m.vision_encode_measured ? "measured" : "not_measured"},
+            {"image_embedding_ms", m.image_embedding_measured ? "measured" : "not_measured"}};
 }
 
 json response_json(const GenerateResponse & r, const std::string & hash) {
