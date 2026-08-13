@@ -16,8 +16,8 @@ Roadmap items are planned work, not implemented capability or delivery commitmen
 
 ## P1: focused inference optimization
 
-- [ ] OPT-1: implement text-only single-hot Prefix Reuse in the real Qwen2.5-VL `MtmdBackend` path
-- [ ] Pass exact/branch/session/image/cancel/timeout/reset KV correctness gates
+- [x] OPT-1: implement text-only single-hot Prefix Reuse in the real Qwen2.5-VL `MtmdBackend` path
+- [x] Pass exact/branch/session/image/cancel/timeout/reset KV correctness gates
 - [ ] Benchmark cold versus hot Prefill/TTFT at 256/512/1024/2048 prompt tokens (**Jetson required**)
 - [ ] Measure real RAG prompt LCP distribution before integrating Agent-to-Runtime session mapping
 - [ ] OPT-2: profile steady decode with Nsight before selecting any token/s change (**Jetson required**)

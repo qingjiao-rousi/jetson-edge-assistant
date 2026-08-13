@@ -11,6 +11,7 @@ This directory contains the public measurement contract and reviewed summaries. 
 - Final reviewed paired Q4/Q8 single-image end-to-end comparison: `benchmarks/q4-q8-image-paired-20260813.md`
 - Final reviewed paired Q4/Q8 single-image stage-timing comparison: `benchmarks/q4-q8-image-stages-paired-20260813.md`
 - Reviewed OPT-1 corrected 709-token exact-prompt result and retraction history: `benchmarks/opt1-q4-prefix-reuse-20260813.md`
+- Reviewed OPT-1 exact/branch/invalidation correctness matrix: `benchmarks/opt1-t709-correctness-20260813.md`
 - Raw local output: `benchmarks/results/` (Git-ignored)
 
 Clean-commit Q4/Q8 locked-clock text, fixed single-image end-to-end and structured vision-stage summaries are checked in with reviewed aggregate numbers and SHA-256 bindings to local Git-ignored evidence. VLM quality and stability results remain pending. Board telemetry rails are not wall power.

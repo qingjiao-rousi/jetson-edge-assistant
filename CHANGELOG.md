@@ -17,6 +17,7 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Clean-commit paired Q4/Q8 fixed-image end-to-end latency/resource comparison.
 - Clean-commit paired Q4/Q8 fixed-image structured stage-timing comparison.
 - Apache-2.0 project license and third-party/model asset notices.
+- Jetson-reviewed real `MtmdBackend` Prefix Reuse correctness matrix for exact/branch and session/image/timeout/cancel/reset invalidation.
 
 ### Changed
 
