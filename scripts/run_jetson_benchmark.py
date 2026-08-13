@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Run a persistent EdgeOmni VLM Runtime text baseline from a complete asset contract."""
+"""Run a persistent EdgeOmni Runtime text or fixed single-image baseline."""
 
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime
 import hashlib
 import json
@@ -30,6 +31,8 @@ from run_local_assistant import check_port_available, check_runtime_assets, runt
 
 
 DEFAULT_PROMPT = "Summarize the safe first inspection steps for an industrial equipment alarm."
+DEFAULT_IMAGE_PROMPT = "Describe the visible panel state and list only directly observable abnormalities."
+DIAGNOSIS_ENDPOINT = "/v1/diagnose/image"
 
 
 def git_source_state() -> tuple[str, bool, int, str]:
@@ -79,7 +82,37 @@ def read_jetson_clock_status() -> tuple[bool, str, str]:
     return locked, detail, output
 
 
-def runtime_request(config: dict[str, Any], request_id: str, prompt: str, max_new_tokens: int) -> dict[str, Any]:
+def load_benchmark_image(value: str) -> tuple[str, bytes, str, str]:
+    path = (ROOT / value).resolve()
+    if not path.is_relative_to(ROOT) or not path.is_file():
+        raise ValueError("--image must be an existing file inside the repository")
+    data = path.read_bytes()
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        mime = "image/png"
+    elif data.startswith(b"\xff\xd8\xff"):
+        mime = "image/jpeg"
+    elif data.startswith((b"RIFF",)) and data[8:12] == b"WEBP":
+        mime = "image/webp"
+    else:
+        raise ValueError("--image must be a PNG, JPEG, or WebP file")
+    relative = path.relative_to(ROOT).as_posix()
+    return relative, data, mime, hashlib.sha256(data).hexdigest()
+
+
+def runtime_request(config: dict[str, Any], request_id: str, prompt: str, max_new_tokens: int,
+                    image: tuple[str, bytes, str, str] | None = None) -> dict[str, Any]:
+    if image is not None:
+        image_path, image_bytes, image_mime, _image_sha256 = image
+        return {
+            "request_id": request_id,
+            "prompt": prompt,
+            "stream": False,
+            "images": [{
+                "id": image_path,
+                "mime": image_mime,
+                "data_base64": base64.b64encode(image_bytes).decode("ascii"),
+            }],
+        }
     runtime = config["runtime"]
     return {
         "request_id": request_id,
@@ -132,7 +165,9 @@ def wait_ready(config: dict[str, Any], process: subprocess.Popen[bytes], timeout
 def environment_lines(config: dict[str, Any], label: str, prompt: str, repeats: int,
                       clocks_locked: bool, clock_detail: str, git_commit: str,
                       worktree_clean: bool, git_status_entries: int,
-                      git_status_sha256: str) -> list[str]:
+                      git_status_sha256: str,
+                      image: tuple[str, bytes, str, str] | None = None,
+                      max_new_tokens: int = 128) -> list[str]:
     runtime = config["runtime"]
     lines = [
         "status=UNREVIEWED_RAW_RESULT",
@@ -147,12 +182,23 @@ def environment_lines(config: dict[str, Any], label: str, prompt: str, repeats: 
         f"mmproj_path={runtime['mmproj']['path']}",
         f"mmproj_sha256={runtime['mmproj']['sha256']}",
         f"prompt_sha256={hashlib.sha256(prompt.encode('utf-8')).hexdigest()}",
+        f"workload={'single_image' if image is not None else 'text'}",
+        f"endpoint={DIAGNOSIS_ENDPOINT if image is not None else runtime['chat_endpoint']}",
+        f"max_new_tokens={max_new_tokens}",
         f"repeats={repeats}",
         f"clocks_locked={str(clocks_locked).lower()}",
         f"clock_status={clock_detail}",
         f"platform={platform.platform()}",
         f"machine={platform.machine()}",
     ]
+    if image is not None:
+        image_path, image_bytes, image_mime, image_sha256 = image
+        lines.extend([
+            f"image_path={image_path}",
+            f"image_mime={image_mime}",
+            f"image_bytes={len(image_bytes)}",
+            f"image_sha256={image_sha256}",
+        ])
     tegra_release = pathlib.Path("/etc/nv_tegra_release")
     if tegra_release.is_file():
         lines.append(f"nv_tegra_release={tegra_release.read_text(encoding='utf-8').splitlines()[0]}")
@@ -166,7 +212,8 @@ def main() -> int:
     parser.add_argument("--output", default="benchmarks/results")
     parser.add_argument("--repeats", type=int, default=15)
     parser.add_argument("--max-new-tokens", type=int, default=128)
-    parser.add_argument("--prompt", default=DEFAULT_PROMPT)
+    parser.add_argument("--prompt")
+    parser.add_argument("--image", help="repository-relative PNG, JPEG, or WebP fixture for a single-image run")
     parser.add_argument("--tegrastats", help="optional tegrastats executable path")
     parser.add_argument("--ready-timeout", type=float, default=180.0)
     parser.add_argument("--allow-dynamic-clocks", action="store_true", help="mark an exploratory run instead of requiring fixed clocks")
@@ -181,6 +228,13 @@ def main() -> int:
         parser.error("--label is required and may contain letters, digits, '-' and '_'")
     if args.repeats < 1 or args.max_new_tokens < 1 or args.ready_timeout <= 0:
         parser.error("repeats, max-new-tokens, and ready-timeout must be positive")
+    try:
+        image = load_benchmark_image(args.image) if args.image else None
+    except (OSError, ValueError) as error:
+        parser.error(str(error))
+    if image is not None and args.max_new_tokens != 128:
+        parser.error("the /v1/diagnose/image contract fixes max-new-tokens at 128")
+    prompt = args.prompt or (DEFAULT_IMAGE_PROMPT if image is not None else DEFAULT_PROMPT)
 
     git_commit, worktree_clean, git_status_entries, git_status_sha256 = git_source_state()
     if not worktree_clean and not args.allow_dirty_worktree:
@@ -211,8 +265,9 @@ def main() -> int:
     tegrastats_path = output_dir / f"{run_id}-tegrastats.log"
     environment_path.write_text(
         "\n".join(environment_lines(
-            config, args.label, args.prompt, args.repeats, clocks_locked, clock_detail,
+            config, args.label, prompt, args.repeats, clocks_locked, clock_detail,
             git_commit, worktree_clean, git_status_entries, git_status_sha256,
+            image, args.max_new_tokens,
         ))
         + "\njetson_clocks_show_begin\n" + clock_output + "jetson_clocks_show_end\n",
         encoding="utf-8",
@@ -228,17 +283,20 @@ def main() -> int:
         if args.tegrastats:
             with tegrastats_path.open("wb") as telemetry:
                 tegrastats_process = subprocess.Popen([args.tegrastats, "--interval", "1000"], stdout=telemetry, stderr=subprocess.STDOUT)
-        endpoint = runtime["base_url"].rstrip("/") + runtime["chat_endpoint"]
-        warmup = runtime_request(config, f"warmup-{uuid.uuid4().hex}", args.prompt, args.max_new_tokens)
+        endpoint = runtime["base_url"].rstrip("/") + (DIAGNOSIS_ENDPOINT if image is not None else runtime["chat_endpoint"])
+        warmup = runtime_request(config, f"warmup-{uuid.uuid4().hex}", prompt, args.max_new_tokens, image)
         warmup_response = post_json(endpoint, warmup)
         if warmup_response.get("client_http_status") != 200:
             raise RuntimeError(f"warm-up failed: {warmup_response}")
         with jsonl_path.open("w", encoding="utf-8") as output:
             for index in range(1, args.repeats + 1):
                 print(f"benchmark: sample {index}/{args.repeats}", file=sys.stderr, flush=True)
-                body = runtime_request(config, f"measure-{index}-{uuid.uuid4().hex}", args.prompt, args.max_new_tokens)
+                body = runtime_request(config, f"measure-{index}-{uuid.uuid4().hex}", prompt, args.max_new_tokens, image)
                 result = post_json(endpoint, body)
                 result["sample_index"] = index
+                result["workload"] = "single_image" if image is not None else "text"
+                if image is not None:
+                    result["image_sha256"] = image[3]
                 output.write(json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n")
                 output.flush()
                 if result.get("client_http_status") != 200:

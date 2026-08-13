@@ -1,6 +1,6 @@
 # Jetson Benchmark 协议
 
-本协议用于约束公开性能证据。仓库提供采集器、reviewed CSV 和一份 clean commit 的 [Q4 锁频文本基线](../benchmarks/q4-k-m-locked-20260812.md)。Q8、单图性能和长稳结果仍为**待 Jetson 实测**，不得从代码、Q4 数据或旧描述推算。
+本协议用于约束公开性能证据。仓库已提供 [Q4 锁频文本基线](../benchmarks/q4-k-m-locked-20260812.md) 和 [Q4/Q8 配对文本对照](../benchmarks/q4-q8-paired-20260812.md)。单图性能和长稳结果仍为**待 Jetson 实测**，不得从文本数据或旧描述推算。
 
 ## 回答的问题
 
@@ -9,7 +9,7 @@
 3. 固定单图请求的端到端延迟和资源峰值是什么？
 4. 30/60 分钟串行运行是否出现错误、内存持续增长或异常温度/降频？
 
-第 3、4 项当前脚本未自动实现，属于待实测扩展；不得用单次文本 runner 替代。
+第 3 项已有单图采集模式，但仍待在 Jetson 上产生并人工审核证据；第 4 项尚未自动实现。
 
 ## 固定环境字段
 
@@ -75,7 +75,19 @@ scripts/run_jetson_benchmark.sh \
 
 稳定性测试需定义持续时间、请求间隔、总请求数、错误分类、RSS/GPU 内存首末与峰值、温度/频率/功耗采样，以及退出后的端口/进程回收。当前没有可公开长稳结果。
 
-单图测试需固定仓库 fixture、prompt、图片 SHA-256、预处理与 vision 指标口径。合成 panel 冒烟只证明链路返回，不能作为视觉诊断准确率。任何真实设备图都要先完成版权和隐私审查。
+单图测试使用 `--image` 固定仓库 fixture、prompt、图片 SHA-256、MIME 和大小，并通过 `/v1/diagnose/image` 采集 Runtime 返回的预处理、vision encode、image embedding、TTFT 和总延迟。该应用接口固定最多生成 128 token，因此单图模式禁止其他 `--max-new-tokens` 值。
+
+```bash
+scripts/run_jetson_benchmark.sh \
+  --config configs/assistant.json \
+  --label q4-k-m-image-paired \
+  --image tests/fixtures/vlm-service/synthetic-alarm-panel.png \
+  --repeats 15 \
+  --max-new-tokens 128 \
+  --tegrastats /usr/bin/tegrastats
+```
+
+合成 panel 只能用于性能和链路冒烟，不能作为视觉诊断准确率证据。任何真实设备图都要先完成版权和隐私审查。
 
 ## 发布判定
 

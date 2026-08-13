@@ -153,6 +153,6 @@ P2：在明确 SLA 后设计鉴权/审计、多 session KV/调度/内存预算�
 
 ## 最终证据清单
 
-已具备：94 项模型无关 Python 测试、C++ FakeBackend 测试代码、离线资产合同、固定 submodule、合成手册/图片 fixture、同 commit Q4/Q8 `ready -> requests -> stopped` 配对文本基线、37/37 layer offload、公开验证入口、benchmark 协议和 Demo 规范。
+已具备：100 项模型无关 Python 测试、C++ FakeBackend 测试代码、离线资产合同、固定 submodule、合成手册/图片 fixture、同 commit Q4/Q8 `ready -> requests -> stopped` 配对文本基线、37/37 layer offload、公开验证入口、benchmark 协议和 Demo 规范。
 
 待补：单图性能、真实 Jetson CTest 无 skip、RAG 引用/拒答截图、单图 GIF/SSE 记录、clean-clone 离线交付记录、30-60 分钟 soak、systemd 运维证据。Q4/Q8 文本已有统一 RAM/温度/板载 rail；墙插功耗、生产 SLA、准确率和高并发目前不足以证明。

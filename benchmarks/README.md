@@ -12,4 +12,4 @@ This directory contains the public measurement contract and reviewed summaries. 
 
 Clean-commit Q4 and paired Q4/Q8 locked-clock text summaries are checked in with reviewed aggregate numbers and SHA-256 bindings to local Git-ignored evidence. VLM latency and stability results remain pending. Board telemetry rails are not wall power.
 
-The collector consumes a complete Assistant config, starts the matching `MtmdBackend` Runtime once, performs one warm-up plus measured HTTP requests, and stops the Runtime. It intentionally does not pass Qwen2.5-VL assets to the Qwen3-only DirectBackend runner.
+The collector consumes a complete Assistant config, starts the matching `MtmdBackend` Runtime once, performs one warm-up plus measured HTTP requests, and stops the Runtime. Text mode uses the configured chat endpoint; `--image` uses the fixed single-image diagnosis endpoint and binds the repository fixture by SHA-256 without writing its base64 payload to raw results. It intentionally does not pass Qwen2.5-VL assets to the Qwen3-only DirectBackend runner.

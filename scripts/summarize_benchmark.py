@@ -45,6 +45,48 @@ def metric(rows: list[dict], getter: Callable[[dict], float]) -> dict[str, float
     return stats([float(getter(row)) for row in rows])
 
 
+def summarize_rows(rows: list[dict]) -> dict:
+    workloads = sorted({row.get("workload", "text") for row in rows})
+    if len(workloads) != 1:
+        raise ValueError("benchmark JSONL mixes workload types")
+    workload = workloads[0]
+    hashes = sorted({row.get("model_sha256") for row in rows})
+    validity = {
+        "samples": len(rows),
+        "workload": workload,
+        "all_http_200": all(row.get("client_http_status") == 200 for row in rows),
+        "all_error_null": all(row.get("error") is None for row in rows),
+        "model_sha256_values": hashes,
+        "prompt_token_values": sorted({row.get("prompt_tokens") for row in rows}),
+        "output_token_values": sorted({row.get("output_tokens") for row in rows}),
+        "finish_reason_values": sorted({row.get("finish_reason") for row in rows}),
+        "unique_output_texts": len({row.get("text") for row in rows}),
+    }
+    metrics = {
+        "ttft_ms": metric(rows, lambda row: row["metrics"]["ttft_ms"]),
+        "prefill_ms": metric(rows, lambda row: row["metrics"]["prefill_ms"]),
+        "decode_ms": metric(rows, lambda row: row["metrics"]["decode_ms"]),
+        "decode_tokens_per_second": metric(rows, lambda row: row["metrics"]["decode_tokens_per_second"]),
+        "runtime_total_ms": metric(rows, lambda row: row["metrics"]["total_ms"]),
+        "client_total_ms": metric(rows, lambda row: row["client_total_ms"]),
+    }
+    if workload == "single_image":
+        image_hashes = sorted({row.get("image_sha256") for row in rows})
+        if len(image_hashes) != 1 or not image_hashes[0]:
+            raise ValueError("single-image rows must bind one image SHA-256")
+        validity["image_sha256_values"] = image_hashes
+        validity["measurement_status_values"] = sorted({
+            json.dumps(row.get("measurement_status"), sort_keys=True) for row in rows
+        })
+        metrics.update({
+            "image_preprocess_ms": metric(rows, lambda row: row["metrics"]["image_preprocess_ms"]),
+            "vision_encode_ms": metric(rows, lambda row: row["metrics"]["vision_encode_ms"]),
+            "image_embedding_ms": metric(rows, lambda row: row["metrics"]["image_embedding_ms"]),
+            "image_tokens": metric(rows, lambda row: row["image_tokens"]),
+        })
+    return {"schema_version": 1, "validity": validity, "metrics": metrics}
+
+
 def telemetry(path: pathlib.Path) -> dict[str, dict[str, float | int]]:
     text = path.read_text(encoding="utf-8")
     patterns = {
@@ -66,29 +108,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         rows = load_rows(args.jsonl)
-        hashes = sorted({row.get("model_sha256") for row in rows})
-        validity = {
-            "samples": len(rows),
-            "all_http_200": all(row.get("client_http_status") == 200 for row in rows),
-            "all_error_null": all(row.get("error") is None for row in rows),
-            "model_sha256_values": hashes,
-            "prompt_token_values": sorted({row.get("prompt_tokens") for row in rows}),
-            "output_token_values": sorted({row.get("output_tokens") for row in rows}),
-            "finish_reason_values": sorted({row.get("finish_reason") for row in rows}),
-            "unique_output_texts": len({row.get("text") for row in rows}),
-        }
-        summary = {
-            "schema_version": 1,
-            "validity": validity,
-            "metrics": {
-                "ttft_ms": metric(rows, lambda row: row["metrics"]["ttft_ms"]),
-                "prefill_ms": metric(rows, lambda row: row["metrics"]["prefill_ms"]),
-                "decode_ms": metric(rows, lambda row: row["metrics"]["decode_ms"]),
-                "decode_tokens_per_second": metric(rows, lambda row: row["metrics"]["decode_tokens_per_second"]),
-                "runtime_total_ms": metric(rows, lambda row: row["metrics"]["total_ms"]),
-                "client_total_ms": metric(rows, lambda row: row["client_total_ms"]),
-            },
-        }
+        summary = summarize_rows(rows)
         if args.tegrastats:
             summary["telemetry"] = telemetry(args.tegrastats)
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as error:

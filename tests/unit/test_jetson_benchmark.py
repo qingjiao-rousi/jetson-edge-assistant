@@ -1,5 +1,6 @@
 import importlib.util
 import pathlib
+import base64
 import subprocess
 import sys
 import unittest
@@ -44,6 +45,44 @@ EMC MinFreq=3199000000 MaxFreq=3199000000 CurrentFreq=3199000000 FreqOverride=1
         })
         self.assertEqual(request["max_new_tokens"], 32)
         self.assertFalse(request["stream"])
+
+    def test_image_request_uses_diagnosis_contract_without_raw_evidence_metadata(self):
+        config = {"runtime": {"model": {"sha256": "a" * 64}}}
+        image = ("tests/fixture.png", b"png-bytes", "image/png", "b" * 64)
+        request = MODULE.runtime_request(config, "image-1", "inspect", 128, image)
+        self.assertEqual(request["prompt"], "inspect")
+        self.assertEqual(request["images"][0]["id"], "tests/fixture.png")
+        self.assertEqual(request["images"][0]["mime"], "image/png")
+        self.assertEqual(base64.b64decode(request["images"][0]["data_base64"]), b"png-bytes")
+        self.assertNotIn("image_sha256", request)
+
+    def test_image_fixture_is_bound_by_relative_path_mime_and_hash(self):
+        relative, data, mime, digest = MODULE.load_benchmark_image(
+            "tests/fixtures/vlm-service/synthetic-alarm-panel.png"
+        )
+        self.assertEqual(relative, "tests/fixtures/vlm-service/synthetic-alarm-panel.png")
+        self.assertTrue(data.startswith(b"\x89PNG"))
+        self.assertEqual(mime, "image/png")
+        self.assertEqual(digest, "455963a828a1272a60cc6774982b874969c067f4c72bc47ef002a6c719483395")
+
+    def test_image_fixture_rejects_paths_outside_repository(self):
+        with self.assertRaisesRegex(ValueError, "inside the repository"):
+            MODULE.load_benchmark_image("../outside.png")
+
+    def test_environment_binds_workload_endpoint_and_output_limit(self):
+        config = {"runtime": {
+            "model": {"path": "model.gguf", "sha256": "a" * 64},
+            "mmproj": {"path": "mmproj.gguf", "sha256": "b" * 64},
+            "chat_endpoint": "/v1/chat",
+        }}
+        image = ("tests/fixture.png", b"png", "image/png", "c" * 64)
+        lines = MODULE.environment_lines(
+            config, "q4-image", "inspect", 15, True, "locked", "commit", True, 0, "d" * 64,
+            image, 128,
+        )
+        self.assertIn("workload=single_image", lines)
+        self.assertIn("endpoint=/v1/diagnose/image", lines)
+        self.assertIn("max_new_tokens=128", lines)
 
     def test_dry_run_needs_no_config_or_model(self):
         result = subprocess.run(
