@@ -42,7 +42,7 @@ flowchart LR
 | Jetson CUDA 构建/offload | 已有冻结记录 | Jetson AGX Orin 上记录 37/37 layer offload | [Jetson 验证摘要](docs/jetson-validation.md)；完整公开日志待补 |
 | Q4_K_M 文本基线 | **已验证** | MODE_30W 锁频，1 次预热 + 15 次请求；TTFT median 112 ms，decode median 15.098 token/s | [reviewed Q4 报告](benchmarks/q4-k-m-locked-20260812.md)；短时单请求结果，不是生产 SLA |
 | Q4_K_M / Q8_0 配对 | **已验证** | 同一 clean commit、锁频协议下 decode median 为 15.101 / 15.227 token/s；统一 RAM median 为 12,458 / 13,928 MB | [配对报告](benchmarks/q4-q8-paired-20260812.md)；速度近似持平，Q4 以资源效率作为部署优先候选 |
-| Q4_K_M / Q8_0 固定单图 | **已验证 E2E** | 同 clean commit 下 Runtime total median 为 1,530 / 1,462 ms；统一 RAM median 为 12,344.5 / 13,800 MB | [单图配对报告](benchmarks/q4-q8-image-paired-20260813.md)；不代表准确率；视觉阶段拆分已实现，待 clean-commit Jetson 重测 |
+| Q4_K_M / Q8_0 固定单图 | **已验证 E2E + 阶段计时** | clean commit 分阶段重测：vision encode median 305 / 277 ms，embedding 注入 31 / 28 ms；Runtime total 1,531 / 1,463 ms | [阶段计时报告](benchmarks/q4-q8-image-stages-paired-20260813.md)；不代表准确率；`prefill_ms` 包含子阶段，不可相加 |
 | RAG 质量 | **PARTIAL** | 引用与拒答门禁存在 | R2.5 最终质量门未通过，holdout 已消费且不可重跑/调参 |
 | 长稳、高并发、生产鉴权 | 待实测/未实现 | 不作生产能力声明 | [限制](docs/limitations.md) |
 

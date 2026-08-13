@@ -1,6 +1,6 @@
 # Jetson Benchmark 协议
 
-本协议用于约束公开性能证据。仓库已提供 [Q4 锁频文本基线](../benchmarks/q4-k-m-locked-20260812.md)、[Q4/Q8 配对文本对照](../benchmarks/q4-q8-paired-20260812.md) 和 [Q4/Q8 固定单图 E2E 对照](../benchmarks/q4-q8-image-paired-20260813.md)。视觉阶段结构化计时、VLM 质量和长稳结果仍为**待 Jetson 实测**，不得从文本或 E2E 数据推算。
+本协议用于约束公开性能证据。仓库已提供 [Q4 锁频文本基线](../benchmarks/q4-k-m-locked-20260812.md)、[Q4/Q8 配对文本对照](../benchmarks/q4-q8-paired-20260812.md)、[Q4/Q8 固定单图 E2E 对照](../benchmarks/q4-q8-image-paired-20260813.md) 和 [固定单图阶段计时对照](../benchmarks/q4-q8-image-stages-paired-20260813.md)。VLM 质量和长稳结果仍为**待 Jetson 实测**，不得从性能数据推算。
 
 ## 回答的问题
 
@@ -9,7 +9,7 @@
 3. 固定单图请求的端到端延迟和资源峰值是什么？
 4. 30/60 分钟串行运行是否出现错误、内存持续增长或异常温度/降频？
 
-第 3 项已有单图采集模式，但仍待在 Jetson 上产生并人工审核证据；第 4 项尚未自动实现。
+第 3 项已有 clean-commit E2E 与阶段计时证据；第 4 项尚未自动实现。
 
 ## 固定环境字段
 
@@ -71,7 +71,7 @@ scripts/run_jetson_benchmark.sh \
 
 必须报告 `cache_hit_tokens`、`cache_miss_tokens`、`cache_hit_ratio`、`prefill_ms` 和 `cache_invalidation_reason`。只允许表述为“单热 session Token LCP Prefix reuse”，不得称作多用户缓存、paged KV、LRU/TTL 或生产缓存系统。
 
-## 稳定性与 VLM 待实测项
+## 稳定性与 VLM 测量
 
 稳定性测试需定义持续时间、请求间隔、总请求数、错误分类、RSS/GPU 内存首末与峰值、温度/频率/功耗采样，以及退出后的端口/进程回收。当前没有可公开长稳结果。
 
@@ -91,4 +91,4 @@ scripts/run_jetson_benchmark.sh \
 
 ## 发布判定
 
-只有原始 JSON/遥测与聚合表可追溯、环境字段齐全、Q4/Q8 输入一致时，才可计算并发布量化对照。异常/缺失样本必须说明排除理由。当前对外状态为：**Q4/Q8 clean-commit 配对文本和固定单图 E2E 对照已完成；视觉阶段结构化计时、质量和长稳待实测，生产 SLA 不足以证明**。
+只有原始 JSON/遥测与聚合表可追溯、环境字段齐全、Q4/Q8 输入一致时，才可计算并发布量化对照。异常/缺失样本必须说明排除理由。当前对外状态为：**Q4/Q8 clean-commit 配对文本、固定单图 E2E 与视觉阶段结构化计时已完成；质量和长稳待实测，生产 SLA 不足以证明**。

@@ -102,9 +102,9 @@
 ### 评分与定位
 
 - 当前评分：**8.8/10**。
-- 是否适合作为主项目：**适合端侧 AI 部署/C++ Runtime/Jetson 岗位的主项目**。当前已有同 commit Q4/Q8 配对文本与固定单图 E2E 结果，视觉阶段拆分代码也已实现；投递前最值得补的是 2-3 个真实 Demo 截图/GIF、阶段拆分的 clean-commit Jetson 重测和长稳记录。
+- 是否适合作为主项目：**适合端侧 AI 部署/C++ Runtime/Jetson 岗位的主项目**。当前已有同 commit Q4/Q8 配对文本、固定单图 E2E 和视觉阶段计时结果；投递前最值得补的是 2-3 个真实 Demo 截图/GIF、VLM 小型质量集和长稳记录。
 - 主要加分：C++ Runtime 并非薄命令包装；HTTP/SSE/取消超时、单热 KV 状态、资产合同、RAG/Agent 门禁和测试都有代码证据。
-- 主要扣分：单图阶段拆分尚未实机重测，准确率/长稳仍缺公开证据、RAG PARTIAL、HTTP 测试本环境 skip、clean-clone+离线包未独立演练。
+- 主要扣分：准确率/长稳仍缺公开证据、RAG PARTIAL、HTTP 测试本环境 skip、clean-clone+离线包未独立演练。
 
 推荐 GitHub 标题：**EdgeOmni: Offline Multimodal RAG Assistant on Jetson AGX Orin**
 
@@ -117,6 +117,7 @@
 - 为 Qwen2.5-VL-3B GGUF 建立模型/MMProj 大小与 SHA-256、AArch64 ELF、submodule commit 和 SQLite source binding 的离线资产合同与只读 preflight。
 - 建立 Q4_K_M/Q8_0 可复现实验协议与 Jetson 采集器；同一 clean commit 下各完成 15 次锁频请求，decode 中位数 15.101/15.227 token/s、统一 RAM 中位数 12,458/13,928 MB，并通过 SHA-256 绑定 Runtime/collector/raw evidence。
 - 为固定合成单图建立 Q4/Q8 clean-commit E2E 对照：15/15 请求成功，Runtime total 中位数 1,530/1,462 ms，同时明确 `not_measured` 视觉阶段零值不可当作 0 ms 结论。
+- 在后续 clean commit 接入结构化阶段计时并重测：Q4/Q8 vision encode 中位数 305/277 ms、embedding 注入 31/28 ms，所有阶段均带显式 measured 状态和原始证据哈希。
 
 ### 简历描述：嵌入式 AI / 边缘计算 / Jetson
 
@@ -140,20 +141,20 @@
 
 ### 最值得继续优化的方面
 
-1. 单图可观测性：当前代码已修复 0 ms/未测量语义并接入三阶段指标；提交后在 Jetson 上按同协议重测。
+1. VLM 质量证据：使用独立、不参与调参的小型真实设备图集，定义可观察事实、拒答和引用口径；当前合成 fixture 只能证明链路与性能。
 2. 真实 Demo：RAG 引用/拒答、单图诊断和 SSE 的 2-3 个短证据，展示价值高于新增 Web 前端。
-3. 单图性能与质量：分开测量固定 fixture 的视觉阶段延迟，并建立不用于训练/调参的公开小型准确性样例。
+3. 单图性能与质量：在现有固定 fixture 阶段计时之外，增加不同分辨率输入，并建立不用于训练/调参的公开小型准确性样例。
 4. 可复现部署：新路径或第二台 Jetson 做 clean clone + 离线 bundle 演练。
 5. C++ 测试：在可绑定 loopback 的 CI/Jetson 完整执行 service contract，并明确禁止 silent skip。
 
 ### P1/P2
 
-P1：提交单图视觉阶段结构化计时实现，并在 Jetson 上重测；完成 30-60 分钟串行 soak、HTTP service 全测试、clean-clone 离线演练；增加最小 systemd unit、日志轮转和退出回收验证。除文档/systemd 草案外均需要 Jetson/资产。
+P1：建立小型 VLM 质量集；完成 30-60 分钟串行 soak、HTTP service 全测试、clean-clone 离线演练；增加最小 systemd unit、日志轮转和退出回收验证。除文档/systemd 草案外均需要 Jetson/资产。
 
 P2：在明确 SLA 后设计鉴权/审计、多 session KV/调度/内存预算、持久状态和故障注入；视频/多图与真实全双工语音必须先定义 API、资源预算、数据和实机验证，不应从当前单图/半双工能力外推。
 
 ## 最终证据清单
 
-已具备：101 项模型无关 Python 测试、C++ FakeBackend 测试代码、离线资产合同、固定 submodule、合成手册/图片 fixture、同 commit Q4/Q8 `ready -> requests -> stopped` 配对文本与固定单图 E2E 基线、37/37 layer offload、公开验证入口、benchmark 协议和 Demo 规范。
+已具备：101 项模型无关 Python 测试、C++ FakeBackend 测试代码、离线资产合同、固定 submodule、合成手册/图片 fixture、同 commit Q4/Q8 `ready -> requests -> stopped` 配对文本、固定单图 E2E 与阶段计时基线、37/37 layer offload、公开验证入口、benchmark 协议和 Demo 规范。
 
-待补：单图视觉阶段的 clean-commit Jetson 重测与准确率、真实 Jetson CTest 无 skip、RAG 引用/拒答截图、单图 GIF/SSE 记录、clean-clone 离线交付记录、30-60 分钟 soak、systemd 运维证据。Q4/Q8 文本与固定单图 E2E 已有统一 RAM/温度/板载 rail；墙插功耗、生产 SLA、准确率和高并发目前不足以证明。
+待补：单图准确率、真实 Jetson CTest 无 skip、RAG 引用/拒答截图、单图 GIF/SSE 记录、clean-clone 离线交付记录、30-60 分钟 soak、systemd 运维证据。Q4/Q8 文本、固定单图 E2E 与阶段计时已有统一 RAM/温度/板载 rail；墙插功耗、生产 SLA、准确率和高并发目前不足以证明。

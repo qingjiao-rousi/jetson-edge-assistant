@@ -15,6 +15,7 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Clean-commit paired Q4/Q8 text comparison with reviewed performance/resource boundaries.
 - Fixed single-image Jetson benchmark mode with image SHA-256 binding and vision-stage summaries.
 - Clean-commit paired Q4/Q8 fixed-image end-to-end latency/resource comparison.
+- Clean-commit paired Q4/Q8 fixed-image structured stage-timing comparison.
 - Apache-2.0 project license and third-party/model asset notices.
 
 ### Changed
@@ -28,4 +29,4 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 ### Known limitations
 
 - RAG M9.1B R2.5 remains PARTIAL.
-- Structured vision-stage timing, VLM quality, long-run stability, wall power and demo captures remain pending evidence.
+- VLM quality, long-run stability, wall power and demo captures remain pending evidence.

@@ -18,9 +18,9 @@
 | --- | --- | --- |
 | 37/37 CUDA layer offload | clean Q4 Runtime 日志已核对，公开报告绑定其 SHA-256 | 原始长日志仍保留在 Git-ignored 本地证据目录 |
 | Q4/Q8 各 15 次基线 | 同 clean commit 锁频配对文本数值已公开 | 速度近似持平；Q4 的部署优先理由是资源效率，不外推到单图、长上下文或质量 |
-| Q4/Q8 固定单图 E2E | 同 clean commit、同图同 prompt 各 15 次数值已公开 | Q8 E2E median 低 4.44%，但统一 RAM 多 1,455.5 MB；不是质量或通用 VLM 结论 |
+| Q4/Q8 固定单图 E2E | 同 clean commit、同图同 prompt 各 15 次数值已公开 | 最新阶段计时 commit 中 Q8 E2E median 低 4.44%，但统一 RAM 多 1,403 MB；不是质量或通用 VLM 结论 |
 | 功耗、RAM/GPU 内存、温度 | Q4/Q8 报告包含板载 rail、统一 RAM、CUDA model buffer 和温度统计 | 不是墙插功耗、独立 GPU 内存遥测或长期峰值；长稳仍待实测 |
-| 单图阶段拆分 | 旧 reviewed commit 的结构化响应为 `not_measured`；当前代码已增加显式 measured 状态并拆分 mtmd 阶段 | 编译与模型无关合同已通过；待 clean-commit Jetson Q4/Q8 重测后才发布数值 |
+| 单图阶段拆分 | clean commit、同图同 prompt 各 15 次，三个字段均为 `measured` | Q4/Q8 vision encode median 305/277 ms，embedding 注入 31/28 ms；预处理为低于整数毫秒精度的 `0 ms measured` |
 | 长稳与错误率 | 不足以证明 | 待定义 30-60 分钟串行 soak 并记录请求数/错误/资源趋势 |
 | 生产并发/SLA | 未实现且不足以证明 | 不应由当前单活动请求原型外推 |
 
@@ -79,3 +79,11 @@ Q4/Q8 decode throughput 中位数分别为 15.101/15.227 token/s，Runtime total
 Q4/Q8 Runtime total 中位数为 1,530/1,462 ms，TTFT 为 598/537 ms；Q8 在该固定请求下 E2E 低 4.44%。但 Q8 统一 RAM 中位数为 13,800 MB，比 Q4 的 12,344.5 MB 多 1,455.5 MB，model ready 也从 4,834 ms 增至 6,719 ms。因此仍以 Q4 作为部署优先候选；该选择基于资源效率，不是否认本次 Q8 的小幅 E2E 优势。
 
 三个视觉阶段字段在结构化响应中均为 `not_measured`，对应零值不按 0 ms 解读。合成图仅用于端到端性能/链路证据，不构成诊断准确率或量化质量结论。完整口径与 artifact hash 见 [单图配对报告](../benchmarks/q4-q8-image-paired-20260813.md)。
+
+## 2026-08-13 Q4/Q8 clean-commit 固定单图阶段计时
+
+在 clean commit `f806e59e01b5275ed8a06e18b0e4ce53f7563425` 上，以相同单图协议重新完成 Q4/Q8 各 1 次预热和 15 次有效请求。两组均为 15/15 HTTP 200、37/37 layer offload，且 `image_preprocess_ms`、`vision_encode_ms`、`image_embedding_ms` 在全部响应中均明确标记为 `measured`。
+
+Q4/Q8 vision encode 中位数为 305/277 ms，image embedding 注入为 31/28 ms，Runtime total 为 1,531/1,463 ms。两组 image preprocessing 都是 `0 ms measured`，表示低于当前整数毫秒精度，不是未测量。`prefill_ms` 是包含视觉子阶段的聚合区间，不能与子阶段求和。
+
+Q8 在该固定请求中的视觉阶段和 E2E 延迟较低，但统一 RAM 中位数为 14,182 MB，比 Q4 的 12,779 MB 多 1,403 MB；Q4 仍作为 32 GB 目标的资源优先候选。完整分位数、计时边界和 artifact hash 见 [阶段计时报告](../benchmarks/q4-q8-image-stages-paired-20260813.md)。该合成 fixture 不构成准确率证据。
