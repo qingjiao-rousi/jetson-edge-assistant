@@ -153,6 +153,10 @@ python3 scripts/validate_mtmd_prefix_reuse.py \
 
 `PASS` 只说明这一次 Runtime correctness matrix 通过。输出 JSON 是 local raw evidence，仍需绑定 clean commit、模型 hash 和运行日志后才能支持对外声明。
 
+长度矩阵与长稳协议（仍为 `IN_PROGRESS`）：在锁频 Jetson 上运行 `scripts/generate_opt1_prompts.py --output-dir /tmp/edgeomni-opt1/prompts`，它必须用真实 Q4 tokenizer 逐档得到 256/512/1024/2048 token，不能按字符估算。随后执行 `scripts/run_opt1_length_matrix.sh`，每个 disabled/single-hot 配对为 1 warm-up + 30 measured；`scripts/audit_opt1_matrix.py` 要求 30 行、HTTP/error 全通过、跨模式输出字节一致、token/finish 形状一致、disabled 零命中、hot hit+miss 等于 prompt token 且 hit 不超过公共前缀。任一失败均非零退出且不写审核报告。
+
+Soak 使用 `scripts/run_opt1_soak.py --minutes 30`（可选 120）分别运行 disabled 和 single-hot，默认固定 1024-token prompt；记录请求、输出 hash、cache accounting、Runtime 日志和可选 tegrastats。`scripts/audit_opt1_soak.py` 的 PASS 要求零 HTTP/结构化错误且 accounting 完整；RAM 首/末/峰值、温度和时钟只作为观测，tegrastats unified RAM 不能单独证明 KV leak。所有 raw JSON、日志和 prompt 保持 ignored，审核后才可写公开聚合结论。
+
 ### 性能协议
 
 - Q4 作为主部署模型；Q8 只在 Q4 机制稳定后做有限对照。

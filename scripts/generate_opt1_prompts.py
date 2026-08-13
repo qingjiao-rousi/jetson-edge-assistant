@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""Generate exact-token, synthetic OPT-1 prompts using the real Q4 tokenizer."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import pathlib
+import re
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+DEFAULT_TOKENIZER = ROOT / "third_party/llama.cpp-omni/build-jetson-release/bin/llama-tokenize"
+DEFAULT_MODEL = ROOT / "models/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf"
+
+
+def token_count(tokenizer: pathlib.Path, model: pathlib.Path, prompt: pathlib.Path) -> int:
+    result = subprocess.run([str(tokenizer), "--model", str(model), "--file", str(prompt), "--ids", "--show-count", "--log-disable"],
+                            cwd=ROOT, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(f"tokenizer failed ({result.returncode}): {result.stderr[-500:]}")
+    matches = re.findall(r"Total number of tokens:\s*(\d+)", result.stdout)
+    if len(matches) != 1:
+        raise RuntimeError("tokenizer did not emit exactly one token count")
+    return int(matches[0])
+
+
+def generate(target: int, tokenizer: pathlib.Path, model: pathlib.Path, output: pathlib.Path) -> dict:
+    if not tokenizer.is_file() or not model.is_file():
+        raise FileNotFoundError("a local Q4 model and executable llama-tokenize are required")
+    base = ("SYNTHETIC OPT-1 PREFIX REUSE PROMPT. This text contains no private or model-derived "
+            "information. Repeat the deterministic filler below and treat it as plain user context.\n")
+    unit = "edgeomni "
+    low, high = 0, max(64, target * 3)
+    probe = output.with_suffix(output.suffix + ".probe")
+    def write(n: int) -> int:
+        probe.write_text(base + unit * n, encoding="utf-8")
+        return token_count(tokenizer, model, probe)
+    while write(high) < target:
+        high *= 2
+    while low < high:
+        mid = (low + high) // 2
+        if write(mid) < target:
+            low = mid + 1
+        else:
+            high = mid
+    found = None
+    for n in range(max(0, low - 4), low + 5):
+        count = write(n)
+        if count == target:
+            found = n
+            break
+    probe.unlink(missing_ok=True)
+    if found is None:
+        raise RuntimeError(f"could not construct exact {target}-token prompt with tokenizer")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(base + unit * found, encoding="utf-8")
+    return {"target_tokens": target, "token_count": token_count(tokenizer, model, output),
+            "path": str(output), "sha256": hashlib.sha256(output.read_bytes()).hexdigest(), "synthetic_only": True}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output-dir", type=pathlib.Path, required=True)
+    parser.add_argument("--tokenizer", type=pathlib.Path, default=DEFAULT_TOKENIZER)
+    parser.add_argument("--model", type=pathlib.Path, default=DEFAULT_MODEL)
+    parser.add_argument("--targets", type=int, nargs="*", default=[256, 512, 1024, 2048])
+    args = parser.parse_args()
+    try:
+        results = [generate(target, args.tokenizer.resolve(), args.model.resolve(), args.output_dir / f"p{target}.txt") for target in args.targets]
+    except (OSError, RuntimeError, ValueError) as error:
+        print(f"prompt generation failed: {error}", file=sys.stderr)
+        return 1
+    print(json.dumps(results, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

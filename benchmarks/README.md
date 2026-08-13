@@ -13,6 +13,9 @@ This directory contains the public measurement contract and reviewed summaries. 
 - Reviewed OPT-1 corrected 709-token exact-prompt result and retraction history: `benchmarks/opt1-q4-prefix-reuse-20260813.md`
 - Reviewed OPT-1 exact/branch/invalidation correctness matrix: `benchmarks/opt1-t709-correctness-20260813.md`
 - Raw local output: `benchmarks/results/` (Git-ignored)
+- OPT-1 prompt generation: `scripts/generate_opt1_prompts.py` (requires the real Q4 `llama-tokenize` and model; writes only local ignored inputs)
+- OPT-1 length matrix: `scripts/run_opt1_length_matrix.sh`; audit each pair with `scripts/audit_opt1_matrix.py`
+- OPT-1 soak raw collection/audit: `scripts/run_opt1_soak.py` and `scripts/audit_opt1_soak.py` (unified RAM is not proof of a KV leak)
 
 Clean-commit Q4/Q8 locked-clock text, fixed single-image end-to-end and structured vision-stage summaries are checked in with reviewed aggregate numbers and SHA-256 bindings to local Git-ignored evidence. VLM quality and stability results remain pending. Board telemetry rails are not wall power.
 
