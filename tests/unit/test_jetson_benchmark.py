@@ -97,6 +97,18 @@ EMC MinFreq=3199000000 MaxFreq=3199000000 CurrentFreq=3199000000 FreqOverride=1
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("no Runtime started", result.stdout)
 
+    def test_prompt_file_cannot_be_combined_with_inline_prompt(self):
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "run_jetson_benchmark.py"),
+             "--label", "validation", "--prompt", "inline", "--prompt-file", "tests/fixtures/vlm-context/README.md"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("mutually exclusive", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
