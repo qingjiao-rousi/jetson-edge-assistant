@@ -10,6 +10,7 @@
 
 #include "edgeomni/vlm_asset_verifier.h"
 #include "edgeomni/vlm_input_validator.h"
+#include "edgeomni/prefix_reuse_policy.h"
 #include "llama_backend_lifecycle.h"
 #include "llama.h"
 #include "mtmd-helper.h"
@@ -232,8 +233,9 @@ GenerateResponse MtmdBackend::generate_text(const GenerateRequest & request, con
     } else if (!impl_->hot_session_id.empty() && impl_->hot_session_id != request.session_id) {
         clear_hot("session_id_changed");
     } else if (!impl_->hot_prompt_tokens.empty()) {
-        while (reused < impl_->hot_prompt_tokens.size() && reused < prompt_token_ids.size() && impl_->hot_prompt_tokens[reused] == prompt_token_ids[reused]) ++reused;
-        if (reused == prompt_token_ids.size() && reused > 0U) --reused;
+        size_t lcp = 0;
+        while (lcp < impl_->hot_prompt_tokens.size() && lcp < prompt_token_ids.size() && impl_->hot_prompt_tokens[lcp] == prompt_token_ids[lcp]) ++lcp;
+        reused = reusable_prefix_tokens(lcp, prompt_token_ids.size(), impl_->config.batch_tokens);
         if (!remove_kv_range(reused)) { clear_hot("kv_rollback_failed"); reused = 0; }
     } else {
         llama_memory_clear(llama_get_memory(impl_->context.get()), false);

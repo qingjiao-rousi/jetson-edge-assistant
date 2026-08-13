@@ -2,7 +2,7 @@
 
 最后更新：2026-08-13  
 公开作品集基线：`d11617e` (`docs(benchmark): publish paired VLM stage timings`)  
-当前阶段：**OPT-1 短 prompt 已完成首轮 Jetson 验证，长 prompt 与完整正确性矩阵待实测**
+当前阶段：**OPT-1 长 prompt 发现正确性偏差，batch-boundary rollback 修复待 Jetson 复验**
 
 本文是基线之后性能优化工作的唯一状态源。`README.md` 只展示摘要，`ROADMAP.md` 只保留里程碑。每次实验更新本页的状态、证据和决策记录，不用未审核结果覆盖既有 reviewed baseline。
 
@@ -28,7 +28,7 @@
 | Jetson 短时性能证据 | **完成** | Q4/Q8 文本、固定单图 E2E/阶段计时和资源遥测 | 不代表长稳、墙插功耗、质量或生产尾延迟 |
 | RAG/VLM 质量 | **部分完成** | 引用/拒答合同；RAG R2.5 明确为 PARTIAL | 新独立 RAG eval、真实 VLM 小型质量集 |
 | 部署运维 | **部分完成** | 原生离线构建/启动/校验流程 | clean-clone 演练、无 skip HTTP CTest、systemd、日志轮转、soak |
-| 深入性能优化 | **OPT-1 首轮已验证，整体仍进行中** | 真实 Q4 MtmdBackend 30 次 disabled/single-hot 配对文本结果 | 长 prompt、失效矩阵、Q8 对照、稳定性 |
+| 深入性能优化 | **OPT-1 正确性修复中** | 22-token 观察已撤回；709-token 实验发现 cold/hot 输出不等价 | 修复后 clean-commit 复验、失效矩阵、稳定性 |
 | 生产化 | **未实现且非当前目标** | 无 | 鉴权、审计、多用户调度、故障注入、生产 SLA |
 
 不使用一个笼统百分比描述整个项目，因为“作品集完整度”和“生产完整度”不是同一分母。当前可以准确表述为：**作品集 P0 和声明范围内的核心原型已完成；质量、长稳和生产化仍未完成。**
@@ -49,7 +49,7 @@
 
 | ID | 优化线 | 当前状态 | 主指标 | 招聘价值 | 进入条件 |
 | --- | --- | --- | --- | --- | --- |
-| OPT-1 | 真实 `MtmdBackend` Prefix Reuse | **IN_PROGRESS** | Prefill、TTFT、hit tokens | 最高：Runtime 状态管理与正确性 | 长 prompt 与完整正确性矩阵 |
+| OPT-1 | 真实 `MtmdBackend` Prefix Reuse | **IN_PROGRESS** | Prefill、TTFT、hit tokens | 最高：Runtime 状态管理与正确性 | batch-boundary 修复的 Jetson 复验 |
 | OPT-2 | Nsight 驱动 decode 优化 | **PLANNED** | token/s、TPOT、GPU timeline | 高，但最终提速不确定 | OPT-1 数据稳定后 |
 | OPT-3 | 多分辨率 VLM 权衡 | **PLANNED** | image tokens、vision latency、质量 | 中高：端侧视觉资源策略 | 先冻结质量集 |
 | OPT-4 | RAG/HTTP/图片解码小开销 | **MEASURE FIRST** | 分阶段延迟、占比 | 中；只优化已证明瓶颈 | profiling 显示值得做 |
@@ -201,6 +201,8 @@ experiment/vlm-token-budget  # OPT-3
 | 2026-08-13 | 冻结 `d11617e` 为公开作品集基线；不把它称为生产版本 | 已有 reviewed 文本/单图报告，main clean |
 | 2026-08-13 | 第一深入方向选择真实 `MtmdBackend` text-only Prefix Reuse | 已实现；真实模型/Jetson 验证待完成 |
 | 2026-08-13 | 在实验分支实现显式 `disabled/single_hot_text` 配置、mtmd 文本 token LCP、KV 回滚和失效策略 | 本地 CMake/CTest 通过；真实模型/Jetson 验证待完成 |
-| 2026-08-13 | 完成 Q4 短 prompt 首轮 disabled/single-hot Jetson 配对 | `benchmarks/opt1-q4-prefix-reuse-20260813.md`；21/22 token 命中，TTFT 中位数 112 ms -> 78 ms；OPT-1 仍未整体 VALIDATED |
+| 2026-08-13 | Q4 短 prompt 首轮 disabled/single-hot 配对 | 后续长 prompt 正确性失败，报告已 RETRACTED，不作为性能证据 |
+| 2026-08-13 | 709-token exact prompt 暴露 one-token rollback 数值偏差 | disabled 输出 22 tokens，hot 输出 11 tokens；暂停扩大 benchmark |
+| 2026-08-13 | Prefix reuse 改为只保留完整 cold-prefill batch，并重算最后一个 cold batch | 709-token prompt 预计命中 512、重算 197；本地测试通过，Jetson 待复验 |
 | 2026-08-13 | Agent/RAG session 映射暂不整合，先用专用 Runtime workload 验证 | 避免同时改变 Runtime 与应用生命周期 |
 | 2026-08-13 | Nsight、多分辨率和小开销优化排在 OPT-1 之后 | 避免多变量和错误归因 |

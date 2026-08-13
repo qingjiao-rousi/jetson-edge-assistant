@@ -7,6 +7,7 @@
 
 #include "edgeomni/chat_template_renderer.h"
 #include "edgeomni/fake_backend.h"
+#include "edgeomni/prefix_reuse_policy.h"
 
 namespace {
 
@@ -24,6 +25,7 @@ edgeomni::RuntimeConfig fake_config() {
     config.model_path = __FILE__;
     config.expected_model_sha256 = "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5";
     config.prefix_reuse_mode = edgeomni::PrefixReuseMode::kSingleHotText;
+    config.batch_tokens = 8;
     return config;
 }
 
@@ -97,8 +99,9 @@ void test_fake_backend() {
     expect(cold.text == hot.text, "cold and hot output are identical");
     expect(hot.metrics.cache_hit_tokens > 0U && hot.metrics.cache_reused,
            "same session reuses prompt token prefix");
-    expect(hot.metrics.cache_miss_tokens == 1U && hot.metrics.prefill_input_tokens == 1U,
-           "full prompt hit re-prefills only the final token");
+    expect(hot.metrics.cache_hit_tokens % config.batch_tokens == 0U &&
+               hot.metrics.cache_miss_tokens > 0U && hot.metrics.prefill_input_tokens == hot.metrics.cache_miss_tokens,
+           "full prompt hit re-prefills the final cold batch");
 
     request.request_id = "prefix-fork";
     request.messages = {{"user", "shared branch"}};
@@ -203,6 +206,15 @@ void test_fake_backend() {
     expect(disabled_second.metrics.cache_hit_tokens == 0U && !disabled_second.metrics.cache_reused,
            "disabled Prefix Reuse does not retain hot KV state");
     expect(disabled.shutdown().ok(), "disabled FakeBackend shuts down");
+
+    expect(edgeomni::reusable_prefix_tokens(709U, 709U, 512U) == 512U,
+           "exact 709-token prompt reuses one complete batch");
+    expect(edgeomni::reusable_prefix_tokens(22U, 22U, 512U) == 0U,
+           "short prompt re-evaluates its only cold batch");
+    expect(edgeomni::reusable_prefix_tokens(1024U, 1024U, 512U) == 512U,
+           "exact batch-aligned prompt re-evaluates the final complete batch");
+    expect(edgeomni::reusable_prefix_tokens(700U, 900U, 512U) == 512U,
+           "branch reuse rounds LCP down to a cold-prefill boundary");
 }
 
 }  // namespace

@@ -1,11 +1,19 @@
 # OPT-1 Q4 text-only Prefix Reuse preliminary result
 
-Status: **REVIEWED PRELIMINARY RESULT - SHORT PROMPT ONLY**
+Status: **RETRACTED - SUPERSEDED BY LONG-PROMPT CORRECTNESS FINDING**
 
-This report compares the disabled and `single_hot_text` Runtime modes for the
+This result must not be used as performance evidence. A later 709-token run
+on clean commit `df9c87c` exposed non-equivalent cold/hot generation: disabled
+mode produced 22 output tokens while the one-token rollback strategy produced
+11. Both responses returned HTTP 200, so transport success was insufficient as
+a correctness gate. The implementation was changed to roll LCP reuse down to
+a complete cold-prefill batch boundary and re-evaluate the final cold batch.
+That correction requires a new clean-commit Jetson A/B run.
+
+The historical data below compares the disabled and `single_hot_text` Runtime modes for the
 experimental `MtmdBackend` Prefix Reuse implementation in commit `ee0d6ea`.
-It is evidence for the Runtime mechanism, not a production SLA or a complete
-OPT-1 validation.
+It is retained as an auditable failed experiment, not as evidence for an
+accepted Runtime optimization.
 
 ## Protocol
 
@@ -55,11 +63,8 @@ are recorded here for review:
 | Single-hot JSONL | `aaa0d92f3dfaa1c38495cc9d52e9a374d9669a0c3b5ffacb0032d49a12800022` |
 | Single-hot tegrastats | `ffbbe342a8af3169fddfdc41ab623338922ad76fb8931985c68c013e55f807f2` |
 
-## Claim boundary
+## Retraction boundary
 
-This result supports that the experimental Runtime path can reuse a single
-text prompt prefix in a real Qwen2.5-VL `MtmdBackend` process under this exact
-short-prompt workload. It does not yet prove long-context scaling, RAG-session
-benefit, image safety invalidation, cancellation recovery, memory stability,
-Q8 behavior, or production multi-user caching. Longer prompts (256/512/1024/
-2048 tokens) and the full correctness matrix remain **待实测**.
+The recorded 22-token observation is not sufficient to support a Prefix Reuse
+performance claim. It remains useful only as provenance for why output
+equivalence across longer prompts is a mandatory correctness gate.

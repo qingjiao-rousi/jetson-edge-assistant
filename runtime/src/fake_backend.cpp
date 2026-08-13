@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <thread>
 
+#include "edgeomni/prefix_reuse_policy.h"
+
 namespace {
 
 std::vector<uint8_t> fake_prompt_tokens(const edgeomni::GenerateRequest & request) {
@@ -44,6 +46,7 @@ Status FakeBackend::initialize(const RuntimeConfig & config) {
     hot_session_id_.clear();
     hot_prompt_tokens_.clear();
     prefix_reuse_mode_ = config.prefix_reuse_mode;
+    prefix_reuse_batch_tokens_ = config.batch_tokens;
     return Status::Ok();
 }
 
@@ -93,9 +96,8 @@ GenerateResponse FakeBackend::generate_text(const GenerateRequest & request, con
             hot_session_id_.clear(); hot_prompt_tokens_.clear();
             response.metrics.cache_invalidation_reason = "session_id_changed";
         }
-        size_t hit = prefix_reuse_mode_ == PrefixReuseMode::kSingleHotText && request.session_id == hot_session_id_ ? common_prefix(hot_prompt_tokens_, prompt_tokens) : 0U;
-        // A valid next-token distribution always requires the final prompt token to be decoded again.
-        if (hit == prompt_tokens.size() && hit > 0U) --hit;
+        const size_t lcp = prefix_reuse_mode_ == PrefixReuseMode::kSingleHotText && request.session_id == hot_session_id_ ? common_prefix(hot_prompt_tokens_, prompt_tokens) : 0U;
+        const size_t hit = reusable_prefix_tokens(lcp, prompt_tokens.size(), prefix_reuse_batch_tokens_);
         response.metrics.cache_hit_tokens = static_cast<uint32_t>(hit);
         response.metrics.cache_miss_tokens = static_cast<uint32_t>(prompt_tokens.size() - hit);
         response.metrics.prefill_input_tokens = response.metrics.cache_miss_tokens;
