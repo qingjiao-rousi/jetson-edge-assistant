@@ -75,6 +75,7 @@ EMC MinFreq=3199000000 MaxFreq=3199000000 CurrentFreq=3199000000 FreqOverride=1
             "model": {"path": "model.gguf", "sha256": "a" * 64},
             "mmproj": {"path": "mmproj.gguf", "sha256": "b" * 64},
             "chat_endpoint": "/v1/chat",
+            "batch_tokens": 512, "ubatch_tokens": 512,
         }}
         image = ("tests/fixture.png", b"png", "image/png", "c" * 64)
         lines = MODULE.environment_lines(
@@ -84,6 +85,7 @@ EMC MinFreq=3199000000 MaxFreq=3199000000 CurrentFreq=3199000000 FreqOverride=1
         self.assertIn("workload=single_image", lines)
         self.assertIn("endpoint=/v1/diagnose/image", lines)
         self.assertIn("max_new_tokens=128", lines)
+        self.assertIn("batch_tokens=512", lines)
 
     def test_dry_run_needs_no_config_or_model(self):
         result = subprocess.run(

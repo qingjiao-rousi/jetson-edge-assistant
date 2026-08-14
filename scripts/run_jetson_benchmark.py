@@ -190,6 +190,8 @@ def environment_lines(config: dict[str, Any], label: str, prompt: str, repeats: 
         f"endpoint={DIAGNOSIS_ENDPOINT if image is not None else runtime['chat_endpoint']}",
         f"max_new_tokens={max_new_tokens}",
         f"repeats={repeats}",
+        f"batch_tokens={runtime['batch_tokens']}",
+        f"ubatch_tokens={runtime['ubatch_tokens']}",
         f"clocks_locked={str(clocks_locked).lower()}",
         f"clock_status={clock_detail}",
         f"platform={platform.platform()}",
