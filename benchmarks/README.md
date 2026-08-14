@@ -16,7 +16,7 @@ This directory contains the public measurement contract and reviewed summaries. 
 - Raw local output: `benchmarks/results/` (Git-ignored)
 - OPT-1 prompt generation/calibration: `scripts/generate_opt1_prompts.py` produces only tokenizer-level `user_prompt_tokens`; `scripts/calibrate_opt1_runtime_tokens.py` measures actual disabled HTTP `runtime_prompt_tokens` including chat template and emits `runtime-p*` labels.
 - OPT-1 length matrix: `scripts/run_opt1_length_matrix.py --calibration ...`; audit each pair with `scripts/audit_opt1_matrix.py`. Warm-up is excluded from the required 30 rows.
-- OPT-1 soak raw collection/audit: `scripts/run_opt1_soak.py` and `scripts/audit_opt1_soak.py` (unified RAM is not proof of a KV leak)
+- OPT-1 soak raw collection/audit: `scripts/run_opt1_soak.py`, `scripts/audit_opt1_soak.py`, and paired formal gate `scripts/audit_opt1_soak_pair.py`. The paired gate requires cross-mode deterministic output hashes as well as each mode's own audit; unified RAM is not proof of a KV leak.
 
 Clean-commit Q4/Q8 locked-clock text, fixed single-image end-to-end and structured vision-stage summaries are checked in with reviewed aggregate numbers and SHA-256 bindings to local Git-ignored evidence. VLM quality and stability results remain pending. Board telemetry rails are not wall power.
 
