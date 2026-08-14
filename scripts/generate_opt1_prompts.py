@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Generate exact-token, synthetic OPT-1 prompts using the real Q4 tokenizer."""
+"""Generate synthetic prompts exact only in tokenizer (user-prompt) tokens.
+
+Use calibrate_opt1_runtime_tokens.py before labeling any workload by Runtime
+prompt_tokens: chat-template tokens make these values different.
+"""
 from __future__ import annotations
 
 import argparse
@@ -56,8 +60,9 @@ def generate(target: int, tokenizer: pathlib.Path, model: pathlib.Path, output: 
         raise RuntimeError(f"could not construct exact {target}-token prompt with tokenizer")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(base + unit * found, encoding="utf-8")
-    return {"target_tokens": target, "token_count": token_count(tokenizer, model, output),
-            "path": str(output), "sha256": hashlib.sha256(output.read_bytes()).hexdigest(), "synthetic_only": True}
+    return {"user_prompt_target_tokens": target, "user_prompt_tokens": token_count(tokenizer, model, output),
+            "runtime_prompt_tokens": None, "label": f"user-p{target}", "path": str(output),
+            "sha256": hashlib.sha256(output.read_bytes()).hexdigest(), "synthetic_only": True}
 
 
 def main() -> int:
@@ -66,12 +71,16 @@ def main() -> int:
     parser.add_argument("--tokenizer", type=pathlib.Path, default=DEFAULT_TOKENIZER)
     parser.add_argument("--model", type=pathlib.Path, default=DEFAULT_MODEL)
     parser.add_argument("--targets", type=int, nargs="*", default=[256, 512, 1024, 2048])
+    parser.add_argument("--manifest", type=pathlib.Path, help="optional local JSON manifest of user-prompt token counts")
     args = parser.parse_args()
     try:
         results = [generate(target, args.tokenizer.resolve(), args.model.resolve(), args.output_dir / f"p{target}.txt") for target in args.targets]
     except (OSError, RuntimeError, ValueError) as error:
         print(f"prompt generation failed: {error}", file=sys.stderr)
         return 1
+    if args.manifest:
+        args.manifest.parent.mkdir(parents=True, exist_ok=True)
+        args.manifest.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(results, indent=2))
     return 0
 

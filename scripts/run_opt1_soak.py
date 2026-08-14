@@ -1,59 +1,40 @@
 #!/usr/bin/env python3
-"""Run a raw Q4 OPT-1 soak; review and interpretation happen separately."""
+"""Collect raw OPT-1 soak evidence; it never declares a reviewed result."""
 from __future__ import annotations
-import argparse, hashlib, json, pathlib, re, subprocess, sys, time, urllib.request
-ROOT = pathlib.Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
-from run_local_assistant import check_runtime_assets, runtime_command, stop_process
-from app.assistant.application import check_runtime, load_config
-def post(url, body):
-    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Content-Type":"application/json"}, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=130) as response: return response.status, json.loads(response.read())
-    except Exception as error: return 0, {"error": str(error)}
-def telemetry_summary(path):
-    if not path or not path.is_file(): return {"status": "not_collected"}
-    text = path.read_text(encoding="utf-8", errors="replace")
-    ram = [int(x) for x in re.findall(r"RAM (\d+)/", text)]
-    temps = [float(x) for x in re.findall(r"(?:cpu|gpu)@([0-9.]+)C", text)]
-    return {"status": "collected", "samples": len(ram), "ram_used_mb": {"first": ram[0], "last": ram[-1], "peak": max(ram)} if ram else {}, "temperature_c": {"peak": max(temps)} if temps else {}}
+import argparse,datetime,hashlib,json,pathlib,re,subprocess,sys,time,uuid
+ROOT=pathlib.Path(__file__).resolve().parents[1];sys.path[:0]=[str(ROOT),str(ROOT/"scripts")]
+from app.assistant.application import check_runtime,load_config
+from run_jetson_benchmark import git_source_state,read_jetson_clock_status,runtime_request,post_json,wait_ready
+from run_local_assistant import check_port_available,check_runtime_assets,runtime_command,stop_process
+def telemetry(path):
+ text=path.read_text(encoding="utf-8",errors="replace") if path.is_file() else "";ram=[int(x) for x in re.findall(r"RAM (\d+)/",text)];temp=[float(x) for x in re.findall(r"(?:cpu|gpu)@([0-9.]+)C",text)]
+ return {"samples":len(ram),"ram_used_mb":{"first":ram[0],"last":ram[-1],"peak":max(ram)} if ram else {},"temperature_c":{"peak":max(temp)} if temp else {},"unified_ram_is_not_a_kv_leak_proof":True}
 def main():
-    p=argparse.ArgumentParser(); p.add_argument("--config", required=True); p.add_argument("--prompt-file", required=True, type=pathlib.Path); p.add_argument("--output", required=True, type=pathlib.Path); p.add_argument("--minutes", type=float, default=30); p.add_argument("--interval", type=float, default=0); p.add_argument("--tegrastats")
-    a=p.parse_args(); config=load_config(a.config); prompt=a.prompt_file.read_text(encoding="utf-8"); runtime=config["runtime"]
-    if runtime["prefix_reuse"] not in ("disabled", "single_hot_text"): print("config must explicitly select disabled or single_hot_text", file=sys.stderr); return 2
-    if a.minutes <= 0 or a.minutes > 120: print("minutes must be >0 and <=120", file=sys.stderr); return 2
-    output=a.output; output.parent.mkdir(parents=True, exist_ok=True); start=time.monotonic(); rows=[]; telemetry=None
-    process=None; log=None; telemetry_process=None; telemetry_file=None
-    try:
-        check_runtime_assets(config)
-        log_path=output.with_suffix(".runtime.log"); log=log_path.open("wb")
-        process=subprocess.Popen(runtime_command(config), cwd=ROOT, stdout=log, stderr=log)
-        if a.tegrastats:
-            telemetry_file=output.with_suffix(".tegrastats.log").open("wb")
-            telemetry_process=subprocess.Popen([a.tegrastats, "--interval", "1000"], stdout=telemetry_file, stderr=subprocess.STDOUT)
-        ready_deadline=time.monotonic()+180
-        while time.monotonic()<ready_deadline:
-            try:
-                check_runtime(config); break
-            except Exception:
-                if process.poll() is not None: raise RuntimeError("Runtime exited before /ready")
-                time.sleep(.2)
-        else: raise RuntimeError("Runtime did not become ready")
-        warmup_status, _ = post(runtime["base_url"]+runtime["chat_endpoint"], {"request_id":"soak-warmup","session_id":"benchmark-prefix-session","messages":[{"role":"user","content":prompt}],"max_new_tokens":128,"timeout_ms":120000,"stream":False,"model_sha256":runtime["model"]["sha256"],"sampling":{"seed":424242,"top_k":1,"top_p":1.0,"min_p":0.0,"temperature":0.0}})
-        if warmup_status != 200: raise RuntimeError(f"soak warm-up failed: HTTP {warmup_status}")
-        deadline=start+a.minutes*60
-        while time.monotonic()<deadline:
-            status, response=post(runtime["base_url"]+runtime["chat_endpoint"], {"request_id":f"soak-{len(rows)+1}","session_id":"benchmark-prefix-session","messages":[{"role":"user","content":prompt}],"max_new_tokens":128,"timeout_ms":120000,"stream":False,"model_sha256":runtime["model"]["sha256"],"sampling":{"seed":424242,"top_k":1,"top_p":1.0,"min_p":0.0,"temperature":0.0}})
-            rows.append({"index":len(rows)+1,"status":status,"response":response,"text_sha256":hashlib.sha256(str(response.get("text","")).encode()).hexdigest()})
-            if a.interval: time.sleep(a.interval)
-        telemetry_path = output.with_suffix(".tegrastats.log")
-        clock = subprocess.run(["/usr/bin/jetson_clocks", "--show"], capture_output=True, text=True, check=False)
-        raw={"status":"UNREVIEWED_RAW_RESULT","mode":runtime["prefix_reuse"],"warmup_http_status":warmup_status,"prompt_sha256":hashlib.sha256(prompt.encode()).hexdigest(),"prompt_tokens":rows[0]["response"].get("prompt_tokens") if rows and isinstance(rows[0]["response"],dict) else None,"requests":rows,"telemetry":telemetry_summary(telemetry_path),"clock_telemetry":clock.stdout + clock.stderr,"unified_ram_is_not_a_kv_leak_proof":True}
-        output.write_text(json.dumps(raw,indent=2)+"\n")
-    finally:
-        if telemetry_process is not None: stop_process(telemetry_process)
-        if telemetry_file is not None: telemetry_file.close()
-        if process is not None: stop_process(process, timeout=20)
-        if log is not None: log.close()
-    print(output); return 0
-if __name__ == "__main__": raise SystemExit(main())
+ p=argparse.ArgumentParser();p.add_argument("--config",required=True);p.add_argument("--prompt-file",type=pathlib.Path,required=True);p.add_argument("--output",type=pathlib.Path,required=True);p.add_argument("--minutes",type=float,default=30);p.add_argument("--interval",type=float,default=0);p.add_argument("--tegrastats",default="/usr/bin/tegrastats");p.add_argument("--allow-dynamic-clocks",action="store_true");p.add_argument("--allow-dirty-worktree",action="store_true");a=p.parse_args()
+ if a.minutes<=0 or a.minutes>120:raise ValueError("minutes must be >0 and <=120")
+ config=load_config(a.config);runtime=config["runtime"];prompt=a.prompt_file.read_text(encoding="utf-8")
+ if runtime["prefix_reuse"] not in ("disabled","single_hot_text"):raise ValueError("config must explicitly use disabled or single_hot_text")
+ commit,clean,entries,status_hash=git_source_state();locked,clock_detail,clock_output=read_jetson_clock_status();exploratory=not clean or not locked
+ if not clean and not a.allow_dirty_worktree:raise RuntimeError("clean worktree required; use --allow-dirty-worktree only for exploratory raw")
+ if not locked and not a.allow_dynamic_clocks:raise RuntimeError(f"fixed clocks required: {clock_detail}")
+ check_runtime_assets(config);check_port_available(runtime["host"],runtime["port"])
+ a.output.parent.mkdir(parents=True,exist_ok=True);log_path=a.output.with_suffix(".runtime.log");tegra_path=a.output.with_suffix(".tegrastats.log");rows=[];reason=None;warmup=None;start=None;end=None;process=None;tegrastats=None;log=None
+ try:
+  log=log_path.open("wb");process=subprocess.Popen(runtime_command(config),cwd=ROOT,stdout=log,stderr=log);wait_ready(config,process,180)
+  tf=tegra_path.open("wb");tegrastats=subprocess.Popen([a.tegrastats,"--interval","1000"],stdout=tf,stderr=subprocess.STDOUT)
+  warmup=post_json(runtime["base_url"]+runtime["chat_endpoint"],runtime_request(config,"soak-warmup",prompt,1))
+  if warmup.get("client_http_status")!=200 or warmup.get("error") is not None:raise RuntimeError(f"warm-up failed: {warmup}")
+  start=time.monotonic();start_utc=datetime.datetime.now(datetime.timezone.utc).isoformat();deadline=start+a.minutes*60
+  while time.monotonic()<deadline:
+   response=post_json(runtime["base_url"]+runtime["chat_endpoint"],runtime_request(config,f"soak-{uuid.uuid4().hex}",prompt,128));rows.append({"index":len(rows)+1,"response":response,"text_sha256":hashlib.sha256(response.get("text","").encode()).hexdigest()})
+   if a.interval:time.sleep(a.interval)
+ except Exception as error:reason=str(error)
+ finally:
+  end=time.monotonic();end_utc=datetime.datetime.now(datetime.timezone.utc).isoformat();stop_process(tegrastats)
+  if 'tf' in locals():tf.close()
+  if process:stop_process(process)
+  if log:log.close()
+  raw={"status":"INCOMPLETE" if reason else ("EXPLORATORY_UNREVIEWED" if exploratory else "UNREVIEWED_RAW_RESULT"),"failure_reason":reason,"mode":runtime["prefix_reuse"],"commit":commit,"worktree_clean":clean,"git_status_entries":entries,"git_status_sha256":status_hash,"model_sha256":runtime["model"]["sha256"],"mmproj_sha256":runtime["mmproj"]["sha256"],"config_sha256":hashlib.sha256(pathlib.Path(a.config).read_bytes()).hexdigest(),"prompt_sha256":hashlib.sha256(prompt.encode()).hexdigest(),"clock_locked":locked,"clock_detail":clock_detail,"clock_output":clock_output,"started_utc":start_utc if start else None,"ended_utc":end_utc,"measured_duration_seconds":round(end-start,3) if start else 0,"warmup":warmup,"requests":rows,"telemetry":telemetry(tegra_path)}
+  a.output.write_text(json.dumps(raw,indent=2)+"\n",encoding="utf-8")
+ print(a.output);return 1 if reason else 0
+if __name__=="__main__":raise SystemExit(main())

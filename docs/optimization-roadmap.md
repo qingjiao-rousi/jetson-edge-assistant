@@ -153,9 +153,9 @@ python3 scripts/validate_mtmd_prefix_reuse.py \
 
 `PASS` 只说明这一次 Runtime correctness matrix 通过。输出 JSON 是 local raw evidence，仍需绑定 clean commit、模型 hash 和运行日志后才能支持对外声明。
 
-长度矩阵与长稳协议（仍为 `IN_PROGRESS`）：在锁频 Jetson 上运行 `scripts/generate_opt1_prompts.py --output-dir /tmp/edgeomni-opt1/prompts`，它必须用真实 Q4 tokenizer 逐档得到 256/512/1024/2048 token，不能按字符估算。随后执行 `scripts/run_opt1_length_matrix.sh`，每个 disabled/single-hot 配对为 1 warm-up + 30 measured；`scripts/audit_opt1_matrix.py` 要求 30 行、HTTP/error 全通过、跨模式输出字节一致、token/finish 形状一致、disabled 零命中、hot hit+miss 等于 prompt token 且 hit 不超过公共前缀。任一失败均非零退出且不写审核报告。
+长度矩阵与长稳协议（仍为 `IN_PROGRESS`）：`generate_opt1_prompts.py` 的 256/512/1024/2048 仅是 tokenizer 级 `user_prompt_tokens`，不能称为 HTTP Runtime 长度。必须用 disabled `calibrate_opt1_runtime_tokens.py` 以固定 sampling、1-token 输出实测 chat-template 后的 `runtime_prompt_tokens`，记录两种 token 数、prompt SHA-256，并用实际 `runtime-p<实测值>` 作为横轴；若不等于目标值不得伪称精确。`run_opt1_length_matrix.py --calibration ...` 只接受 clean/locked 校准 manifest。每个 disabled/single-hot 配对为 1 warm-up（不计入）+ 30 measured；审核器逐行检查 HTTP/error、输出字节、prompt/output/finish、disabled 零 hit、hot accounting/范围/正 hit，失败行会输出且审核失败不生成报告。
 
-Soak 使用 `scripts/run_opt1_soak.py --minutes 30`（可选 120）分别运行 disabled 和 single-hot，默认固定 1024-token prompt；记录请求、输出 hash、cache accounting、Runtime 日志和可选 tegrastats。`scripts/audit_opt1_soak.py` 的 PASS 要求零 HTTP/结构化错误且 accounting 完整；RAM 首/末/峰值、温度和时钟只作为观测，tegrastats unified RAM 不能单独证明 KV leak。所有 raw JSON、日志和 prompt 保持 ignored，审核后才可写公开聚合结论。
+Soak 使用 `run_opt1_soak.py --minutes 30`（可选 120）分别运行 disabled 和 single-hot；Runtime ready 与 warm-up HTTP 200 后才开始计时。默认拒绝 dirty worktree、动态时钟和端口复用；显式允许时只能标记 `EXPLORATORY_UNREVIEWED`。raw 记录 commit、资产/config/prompt hash、clocks、UTC 时间、时长、warm-up、失败原因和完整日志；异常仍保留已收集 raw。soak 审核要求输出 hash 唯一、disabled 零 hit、single-hot 默认 100% 正 hit 和完整 accounting；统一 RAM 首/末/峰值、温度只是资源观测，不能单独证明或否定 KV leak。
 
 ### 性能协议
 
