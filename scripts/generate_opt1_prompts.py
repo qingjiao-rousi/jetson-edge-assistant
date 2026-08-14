@@ -35,26 +35,28 @@ def generate(target: int, tokenizer: pathlib.Path, model: pathlib.Path, output: 
         raise FileNotFoundError("a local Q4 model and executable llama-tokenize are required")
     base = ("SYNTHETIC OPT-1 PREFIX REUSE PROMPT. This text contains no private or model-derived "
             "information. Repeat the deterministic filler below and treat it as plain user context.\n")
-    unit = "edgeomni "
-    low, high = 0, max(64, target * 3)
     probe = output.with_suffix(output.suffix + ".probe")
-    def write(n: int) -> int:
-        probe.write_text(base + unit * n, encoding="utf-8")
-        return token_count(tokenizer, model, probe)
-    while write(high) < target:
-        high *= 2
-    while low < high:
-        mid = (low + high) // 2
-        if write(mid) < target:
-            low = mid + 1
-        else:
-            high = mid
-    found = None
-    for n in range(max(0, low - 4), low + 5):
-        count = write(n)
-        if count == target:
-            found = n
-            break
+    def find_exact(unit: str) -> int | None:
+        low, high = 0, max(64, target * 3)
+        def write(n: int) -> int:
+            probe.write_text(base + unit * n, encoding="utf-8")
+            return token_count(tokenizer, model, probe)
+        while write(high) < target:
+            high *= 2
+        while low < high:
+            mid = (low + high) // 2
+            if write(mid) < target:
+                low = mid + 1
+            else:
+                high = mid
+        for n in range(max(0, low - 8), low + 9):
+            if write(n) == target:
+                return n
+        return None
+    # Probe tokenization rather than assuming a word occupies one token.  The
+    # short ASCII candidates make exact low targets reachable on this model.
+    unit, found = next(((candidate, count) for candidate in ("a ", "b ", "x ", "0 ")
+                        if (count := find_exact(candidate)) is not None), (None, None))
     probe.unlink(missing_ok=True)
     if found is None:
         raise RuntimeError(f"could not construct exact {target}-token prompt with tokenizer")

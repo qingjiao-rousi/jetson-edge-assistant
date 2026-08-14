@@ -14,9 +14,10 @@ def main():
  check_runtime_assets(config);check_port_available(runtime["host"],runtime["port"])
  user_tokens={}
  if a.user_prompt_manifest:
+  if not a.user_prompt_manifest.is_file():p.error(f"--user-prompt-manifest does not exist: {a.user_prompt_manifest}")
   for item in json.loads(a.user_prompt_manifest.read_text(encoding="utf-8")): user_tokens[pathlib.Path(item["path"]).resolve()]=item.get("user_prompt_tokens")
  prompts=sorted(a.prompt_dir.glob("*.txt"));
- if not prompts:raise RuntimeError("no UTF-8 prompt files found")
+ if not prompts:p.error(f"no UTF-8 prompt files found in {a.prompt_dir}")
  exploratory=not clean or not locked;process=None;log=None;items=[]
  try:
   log=a.output.with_suffix(".runtime.log").open("wb");process=subprocess.Popen(runtime_command(config),cwd=ROOT,stdout=log,stderr=log);wait_ready(config,process,180)

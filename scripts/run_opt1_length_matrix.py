@@ -5,6 +5,7 @@ import argparse,json,pathlib,subprocess,sys
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 def main():
  p=argparse.ArgumentParser();p.add_argument("--calibration",type=pathlib.Path,required=True);p.add_argument("--output",default="benchmarks/results/opt1-length");p.add_argument("--tegrastats",default="/usr/bin/tegrastats");a=p.parse_args()
+ if not a.calibration.is_file():p.error(f"--calibration does not exist: {a.calibration}")
  manifest=json.loads(a.calibration.read_text(encoding="utf-8"))
  if manifest.get("status")!="UNREVIEWED_RAW_RESULT":raise RuntimeError("formal matrix requires clean/locked disabled calibration")
  seen=set()
