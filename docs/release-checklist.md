@@ -33,4 +33,12 @@ Use this checklist before a tag, portfolio submission, or public repository snap
 
 ## Current release-hygiene status (2026-08-18)
 
-At the start of this review, the worktree was clean after the Runtime sampling-validation and Prefix-reuse/API documentation commits. This does not mark the pending screenshot/GIF capture, clean-clone plus offline-asset-bundle rehearsal, or RPATH portability work as complete. Keep pass, fail, and skip results separate in any release record; a skipped loopback HTTP test is not a pass.
+P0 engineering and deployment validation is closed against clean-clone input commit `de19d15` and pinned upstream commit `19cc26967140407efe34006a355ab445b35b16ac`:
+
+- Approved offline assets passed size/hash, AArch64 ELF and read-only SQLite binding checks in a new local clone.
+- Fresh CUDA configure/build completed, and the Jetson host run completed 5/5 CTest with 0 failed and 0 skipped.
+- Install produced a relocatable bundle whose 56 canonical ELF files and 14 symlinks passed manifest, strict relative RPATH and `env -u LD_LIBRARY_PATH ldd` checks in the original and a second absolute path.
+- `/ready`, one minimal text request, RAG cited-answer/refusal paths and one fixed-fixture single-image request completed without transport or asset errors.
+- `bash scripts/verify_public_repo.sh` passed with 118 model-independent Python tests during Phase 2 validation.
+
+The documentation commit that records this result is not itself a rerun of the Jetson build. Screenshot/GIF capture remains optional portfolio polish rather than a P0 engineering gate. RAG R2.5 remains PARTIAL; the single-image request is connectivity evidence, not accuracy evidence. No new performance, power, concurrency, stability or production-readiness claim is created by this closeout.

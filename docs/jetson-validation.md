@@ -26,6 +26,31 @@
 
 因此，“Q4 是部署优先候选”现在可由 clean-commit 配对文本结果支持：稳定 decode 速度近似持平，而 Q4 使用更少统一 RAM、CUDA model buffer，并具有更短 model-ready 时间。该结论仍不能外推到单图、长上下文、质量或长稳。
 
+## 2026-08-18 P0 clean-clone 与可移动 bundle 验收
+
+以 EdgeOmni `de19d1594b480e2ba3e9caf7a6ff6f0bfce98178` 和固定
+`llama.cpp-omni` `19cc26967140407efe34006a355ab445b35b16ac` 为输入，在不同于原
+工作区的新本地 clone 中离线初始化 submodule，并只复制合同批准的 Q4 GGUF、
+MMProj、embedding GGUF、RAG SQLite 和冻结上游构建输入。模型/数据库未进入 Git。
+
+- 离线资产的大小/SHA-256、AArch64 ELF、SQLite source binding/read-only 合同通过；
+- fresh relocatable configure 和 CUDA build 通过，Ninja 完成 `576/576`；
+- Jetson 主机 CTest 为 5/5 passed、0 failed、0 skipped，其中 HTTP service test
+  实际绑定 loopback 并通过；
+- install/manifest 通过，记录 56 个 canonical ELF 和 14 个安全 symlink；
+- `bin/*` RUNPATH 严格为 `$ORIGIN/../lib`，`lib/*.so` 严格为 `$ORIGIN`；
+- 清空 `LD_LIBRARY_PATH` 后，私有依赖均解析到当前 bundle，未解析到原仓库；
+- bundle 复制到第二个绝对路径后，manifest verifier、`readelf` 和 `ldd` 再次通过。
+
+最小运行验证包括：`/ready` 返回 ready；文本请求返回非空预期响应；两条 BX-9
+手册问题返回带 `[S1]` 的回答；不存在的设备/故障码问题被拒答；固定合成图经
+`/image` 返回非空文本并明确标识未经过 RAG 引用校验。单图输出存在重复描述，
+因此只证明图片到 Runtime 的端到端连通性，不证明诊断正确性。
+
+本轮不把单次响应中的局部计时当作 benchmark，也不新增准确率、功耗、吞吐、
+并发、长稳或生产能力结论。RAG M9.1B R2.5 继续保持 PARTIAL。以上验收的原始
+模型、数据库、构建目录和终端日志不随公开仓库分发；本节是经审阅的范围摘要。
+
 ## M12 终端单图冒烟
 
 在 Jetson ARM64 环境中，统一入口成功启动 Runtime 并通过 `/ready`。对

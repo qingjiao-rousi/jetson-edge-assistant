@@ -9,10 +9,9 @@ Roadmap items are planned work, not implemented capability or delivery commitmen
 - [x] Demo evidence specification and benchmark result template
 - [x] License, third-party notice, issue and release hygiene
 - [x] Publish reviewed Q4/Q8 text, fixed-image E2E and vision-stage result tables
-- [ ] Publish reviewed, redacted Jetson screenshots/GIF (**Jetson required**)
-- [ ] Rehearse clean clone plus offline asset bundle in a new directory/device (**Jetson and assets required**)
+- [x] Rehearse clean clone plus offline asset bundle in a new path on Jetson, including 5/5 CTest, two-path relocation audit and minimal Runtime/Assistant smoke
 
-`d11617e` is the frozen public portfolio baseline: the declared offline prototype and short-run Jetson evidence are complete, while quality, stability, operations and productionization remain open. Detailed completion boundaries and live optimization status are maintained in `docs/optimization-roadmap.md`.
+P0 engineering and deployment validation is closed. Commit `de19d15` is the validated clean-clone input; later documentation-only commits record that result. Quality, stability, operations and productionization remain open. Detailed completion boundaries and live optimization status are maintained in `docs/optimization-roadmap.md`.
 
 ## P1: focused inference optimization
 
@@ -26,6 +25,7 @@ Roadmap items are planned work, not implemented capability or delivery commitmen
 
 ## P1: deployment evidence
 
+- [ ] Publish reviewed, redacted Jetson screenshots/GIF (**optional portfolio polish; Jetson required**)
 - [x] Run Runtime HTTP contract test where loopback binding is allowed: 2026-08-18 host-side CTest `edgeomni_service_unit_test` 1/1 Passed, exit 0
 - [ ] Add a minimal systemd unit and shutdown/log rotation runbook (**Jetson required**)
 - [x] Run paired 30-minute serial soak with Runtime output/cache/error and Jetson resource observations

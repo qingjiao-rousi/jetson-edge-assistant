@@ -21,6 +21,8 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Jetson-reviewed OPT-1 calibrated Runtime-length matrix and paired 30-minute serial soak, with raw SHA-256 bindings and explicit batch-boundary/resource-observation limits.
 - Runtime HTTP sampling validation for JSON types, integer bounds, finite floating-point values, and structured HTTP 400 errors.
 - Runtime API documentation for sampling defaults, validation errors, and EdgeOmni HTTP defensive bounds.
+- Opt-in Jetson relocatable bundle build with staged `bin/lib` layout, manifest generation and model-independent verifier tests.
+- P0 clean-clone validation for the pinned upstream and approved offline assets, covering fresh CUDA build, 5/5 CTest, two-path relocation audit and minimal Runtime/RAG/single-image smoke.
 
 ### Changed
 
@@ -29,11 +31,11 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Jetson benchmark collection uses the configured persistent VLM Runtime over HTTP rather than the Qwen3-only DirectBackend runner.
 - Runtime port preflight checks for a live listener without binding a probe socket, allowing safe back-to-back benchmark runs after normal shutdown.
 - Runtime image metrics track measurement availability separately from integer millisecond values and split preprocessing, vision encoding and image-embedding injection around stable upstream mtmd APIs.
-- Documented `d11617e` as the public portfolio baseline and separated existing DirectBackend Prefix Reuse from the planned Qwen2.5-VL MtmdBackend optimization path.
+- Recorded `de19d15` as the P0 clean-clone validation input while keeping later documentation-only changes distinct from the tested code baseline.
 - OPT-1 is `INTEGRATED` in `main` as single-hot, text-only, batch-boundary Prefix Reuse over upstream KV APIs; it is not multi-user caching, RAG/Agent session integration, image KV reuse, a production SLA, or a no-leak claim. The 120-minute soak, fault injection, RAG LCP distribution and Agent/RAG mapping remain future work.
 - Sampling validation and its documented bounds are HTTP input guardrails, not a production-service capability claim.
 
 ### Known limitations
 
 - RAG M9.1B R2.5 remains PARTIAL.
-- VLM quality, long-run stability, wall power and demo captures remain pending evidence.
+- VLM quality, long-run stability, wall power and reviewed demo captures remain pending evidence; screenshot/GIF capture is optional portfolio polish rather than a P0 engineering gate.

@@ -1,14 +1,15 @@
 # EdgeOmni 深入优化路线与实时状态
 
 最后更新：2026-08-18
-公开作品集基线：`d11617e` (`docs(benchmark): publish paired VLM stage timings`)
+历史 reviewed benchmark 基线：`d11617e` (`docs(benchmark): publish paired VLM stage timings`)
+P0 clean-clone 验证输入：`de19d15`（可移动 bundle、双路径审计与最小 smoke）
 当前阶段：**OPT-1 已在 main INTEGRATED；main Jetson correctness 证据为 `c97a518`**
 
-本文是基线之后性能优化工作的唯一状态源。`README.md` 只展示摘要，`ROADMAP.md` 只保留里程碑。每次实验更新本页的状态、证据和决策记录，不用未审核结果覆盖既有 reviewed baseline。
+本文是历史 benchmark 基线之后性能优化工作的唯一状态源。`README.md` 只展示摘要，`ROADMAP.md` 只保留里程碑。每次实验更新本页的状态、证据和决策记录，不用未审核结果覆盖既有 reviewed baseline。
 
-## `d11617e` 基线是什么
+## `d11617e` 历史 benchmark 基线是什么
 
-`d11617e` 是一个**可公开展示和复核的作品集基线**，不是生产完成版本，也不是性能优化终点。它冻结了以下内容：
+`d11617e` 是可公开展示和复核的**历史 benchmark 基线**，不是当前 P0 clean-clone 输入、生产完成版本或性能优化终点。它冻结了以下内容：
 
 - C++17 文本/单图 Runtime、HTTP/JSON/SSE、`/health`/`/ready`、超时/取消和单活动请求保护。
 - Qwen2.5-VL `MtmdBackend` 单图路径及 preprocessing、vision encode、image embedding 的显式测量状态。
@@ -204,7 +205,7 @@ OPT-1 已在 main `c97a518` 满足整合门：正确性门全部通过，且文�
 推荐分支：
 
 ```text
-main                         # d11617e 基线及已整合的 OPT-1
+main                         # de19d15 clean-clone 输入及后续文档；包含已整合的 OPT-1
 experiment/mtmd-prefix       # OPT-1 开发与验证历史
 experiment/nsight-decode     # OPT-2
 experiment/vlm-token-budget  # OPT-3
@@ -226,6 +227,7 @@ experiment/vlm-token-budget  # OPT-3
 | 2026-08-13 | Prefix reuse 改为只保留完整 cold-prefill batch，并重算最后一个 cold batch | 709-token prompt 实测命中 512、重算 197；跨模式输出一致 |
 | 2026-08-13 | batch-boundary 修复完成 709-token clean-commit 配对复验 | 30/30 每组成功且跨模式输出一致；Prefill 中位数 978 -> 84 ms，TTFT 1330 -> 439 ms；见 reviewed OPT-1 报告 |
 | 2026-08-13 | 独立 Runtime correctness matrix 通过 | exact/branch 输出匹配 cold；session、image、timeout、cancel、reset 后文本 KV 均 cold；见 `benchmarks/opt1-t709-correctness-20260813.md` |
+| 2026-08-18 | 以 `de19d15` 完成 P0 clean-clone 和可移动离线 bundle 验收 | 新路径 CUDA build、5/5 CTest、双路径 RPATH/ldd verifier 与最小 Runtime/RAG/单图 smoke 通过；RAG 仍为 PARTIAL，单图质量未验证 |
 | 2026-08-13 | Agent/RAG session 映射暂不整合，先用专用 Runtime workload 验证 | 避免同时改变 Runtime 与应用生命周期 |
 | 2026-08-13 | Nsight、多分辨率和小开销优化排在 OPT-1 之后 | 避免多变量和错误归因 |
 | 2026-08-17 | OPT-1 实验分支收口为 VALIDATED | 四档 Runtime-length matrix 与 paired 30-minute soak 通过；不代表生产缓存或 SLA |
