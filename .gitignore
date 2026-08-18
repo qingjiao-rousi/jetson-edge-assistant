@@ -10,6 +10,8 @@ generated/
 # Native and CMake build trees
 build/
 build-*/
+bundle-build-*/
+bundle-phase2-*/
 cmake-build-*/
 **/build/
 **/build-*/
