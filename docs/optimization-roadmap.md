@@ -1,8 +1,8 @@
 # EdgeOmni 深入优化路线与实时状态
 
-最后更新：2026-08-13  
-公开作品集基线：`d11617e` (`docs(benchmark): publish paired VLM stage timings`)  
-当前阶段：**OPT-1 已通过 709-token exact/branch 与失效矩阵实测；长稳与更广 workload 待完成**
+最后更新：2026-08-17
+公开作品集基线：`d11617e` (`docs(benchmark): publish paired VLM stage timings`)
+当前阶段：**OPT-1 已在实验分支 VALIDATED；未合入 main**
 
 本文是基线之后性能优化工作的唯一状态源。`README.md` 只展示摘要，`ROADMAP.md` 只保留里程碑。每次实验更新本页的状态、证据和决策记录，不用未审核结果覆盖既有 reviewed baseline。
 
@@ -27,8 +27,8 @@
 | 核心离线原型 | **完成（按声明范围）** | 文本/单图 Runtime、RAG/Agent、离线合同、Jetson load/ready/请求 | 不包含视频、多图、批处理和高并发 |
 | Jetson 短时性能证据 | **完成** | Q4/Q8 文本、固定单图 E2E/阶段计时和资源遥测 | 不代表长稳、墙插功耗、质量或生产尾延迟 |
 | RAG/VLM 质量 | **部分完成** | 引用/拒答合同；RAG R2.5 明确为 PARTIAL | 新独立 RAG eval、真实 VLM 小型质量集 |
-| 部署运维 | **部分完成** | 原生离线构建/启动/校验流程 | clean-clone 演练、无 skip HTTP CTest、systemd、日志轮转、soak |
-| 深入性能优化 | **OPT-1 correctness 已验证，整体仍进行中** | 709-token Q4 clean-commit 30 次配对、exact/branch/失效矩阵通过 | 稳定性、更多 prompt 长度、可选 Q8 对照 |
+| 部署运维 | **部分完成** | 原生离线构建/启动/校验流程、OPT-1 30 分钟 serial soak | clean-clone 演练、无 skip HTTP CTest、systemd、日志轮转、120 分钟/故障注入 |
+| 深入性能优化 | **OPT-1 VALIDATED（实验分支）** | 709-token correctness、四档 Runtime-length matrix、paired 30 分钟 soak | Q8 对照、RAG LCP 分布、Agent/RAG 映射 |
 | 生产化 | **未实现且非当前目标** | 无 | 鉴权、审计、多用户调度、故障注入、生产 SLA |
 
 不使用一个笼统百分比描述整个项目，因为“作品集完整度”和“生产完整度”不是同一分母。当前可以准确表述为：**作品集 P0 和声明范围内的核心原型已完成；质量、长稳和生产化仍未完成。**
@@ -49,7 +49,7 @@
 
 | ID | 优化线 | 当前状态 | 主指标 | 招聘价值 | 进入条件 |
 | --- | --- | --- | --- | --- | --- |
-| OPT-1 | 真实 `MtmdBackend` Prefix Reuse | **IN_PROGRESS** | Prefill、TTFT、hit tokens | 最高：Runtime 状态管理与正确性 | 长稳与更多 workload |
+| OPT-1 | 真实 `MtmdBackend` Prefix Reuse | **VALIDATED** | Prefill、TTFT、hit tokens | 最高：Runtime 状态管理与正确性 | main 合入前复核；120 分钟/故障注入与整合后续独立进行 |
 | OPT-2 | Nsight 驱动 decode 优化 | **PLANNED** | token/s、TPOT、GPU timeline | 高，但最终提速不确定 | OPT-1 数据稳定后 |
 | OPT-3 | 多分辨率 VLM 权衡 | **PLANNED** | image tokens、vision latency、质量 | 中高：端侧视觉资源策略 | 先冻结质量集 |
 | OPT-4 | RAG/HTTP/图片解码小开销 | **MEASURE FIRST** | 分阶段延迟、占比 | 中；只优化已证明瓶颈 | profiling 显示值得做 |
@@ -153,7 +153,7 @@ python3 scripts/validate_mtmd_prefix_reuse.py \
 
 `PASS` 只说明这一次 Runtime correctness matrix 通过。输出 JSON 是 local raw evidence，仍需绑定 clean commit、模型 hash 和运行日志后才能支持对外声明。
 
-长度矩阵与长稳协议（仍为 `IN_PROGRESS`）：`generate_opt1_prompts.py` 的 256/512/1024/2048 仅是 tokenizer 级 `user_prompt_tokens`，不能称为 HTTP Runtime 长度。必须用 disabled `calibrate_opt1_runtime_tokens.py` 以固定 sampling、1-token 输出实测 chat-template 后的 `runtime_prompt_tokens`，记录两种 token 数、prompt SHA-256，并用实际 `runtime-p<实测值>` 作为横轴；若不等于目标值不得伪称精确。当前 single-hot text-only 策略只保留完整 cold-prefill batch，batch/ubatch=512 是收益下限：实际 prompt 小于 512 的零 hit 是 `PASS_EXPECTED_NO_REUSE`，只验证 cold-path 正确性，不声称优化收益，更不能回退到曾产生跨模式输出差异的非 batch-aligned rollback。`run_opt1_length_matrix.py --calibration ...` 只接受 clean/locked 校准 manifest。每个 disabled/single-hot 配对为 1 warm-up（不计入）+ 30 measured；审核器逐行分类为 `PASS_REUSE`、`PASS_EXPECTED_NO_REUSE` 或 `FAIL`。仅 `PASS_REUSE` 进入复用延迟统计；soak 尚未完成，所以 OPT-1 仍为 `IN_PROGRESS`。
+长度矩阵与长稳验证（已在实验分支 `VALIDATED`）：`generate_opt1_prompts.py` 的 256/512/1024/2048 仅是 tokenizer 级 `user_prompt_tokens`，不能称为 HTTP Runtime 长度。disabled 校准得到实际 `runtime-p264`、`runtime-p520`、`runtime-p1032`、`runtime-p2056`；每档 1 warm-up（不计入）+ 30 measured。batch/ubatch=512 是收益下限：264-token 的零 hit 为 `PASS_EXPECTED_NO_REUSE`，只验证 cold-path 正确性，不声称优化收益；520/1032/2056 为 `PASS_REUSE`。paired 30-minute `runtime-p1032` soak 通过输出 hash、cache/error、stable-clock 和 duration gates；其资源趋势仅为观测，不能证明或否定 KV leak。见 `benchmarks/opt1-q4-length-matrix-20260814.md` 和 `benchmarks/opt1-q4-soak-20260817.md`。120 分钟 soak、故障注入、RAG LCP 分布和 Agent/RAG 映射仍待完成。
 
 Soak 使用 `run_opt1_soak.py --minutes 30`（可选 120）分别运行 disabled 和 single-hot；Runtime ready 与 warm-up HTTP 200 后才开始计时。默认拒绝 dirty worktree、动态时钟和端口复用；显式允许时只能标记 `EXPLORATORY_UNREVIEWED`。raw 记录 commit、资产/config/prompt hash、可比 Runtime 参数、clocks、UTC 时间、请求时长、warm-up、失败原因和完整日志；异常仍保留已收集 raw。单侧 soak 审核要求输出 hash 唯一、disabled 零 hit、single-hot 默认 100% 正 hit 和完整 accounting。正式 paired 结论必须再经 `audit_opt1_soak_pair.py`：两侧都必须是 formal raw、provenance/Runtime 参数/clock 一致、duration 充分、response shape 和唯一 output hash 跨模式一致。它还报告 tegrastats 前/后 20% RAM 中位数与峰值作为短时资源趋势；统一 RAM、温度和该趋势都只是资源观测，不能单独证明或否定 KV leak。
 
@@ -232,3 +232,4 @@ experiment/vlm-token-budget  # OPT-3
 | 2026-08-13 | 独立 Runtime correctness matrix 通过 | exact/branch 输出匹配 cold；session、image、timeout、cancel、reset 后文本 KV 均 cold；见 `benchmarks/opt1-t709-correctness-20260813.md` |
 | 2026-08-13 | Agent/RAG session 映射暂不整合，先用专用 Runtime workload 验证 | 避免同时改变 Runtime 与应用生命周期 |
 | 2026-08-13 | Nsight、多分辨率和小开销优化排在 OPT-1 之后 | 避免多变量和错误归因 |
+| 2026-08-17 | OPT-1 实验分支收口为 VALIDATED | 四档 Runtime-length matrix 与 paired 30-minute soak 通过；不代表 main INTEGRATED、生产缓存或 SLA |
