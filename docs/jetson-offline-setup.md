@@ -74,6 +74,31 @@ After `build-inputs` passes, the top-level CMake project can build EdgeOmni libr
 libraries directly; it does not build llama.cpp-omni. The upstream build-tree CMake package is not
 relocatable and must not be used as an install package.
 
+## Opt-In Relocatable Bundle
+
+The normal frozen `build-jetson-release` path remains supported. For a derived, untracked bundle,
+configure a separate build from the repository root:
+
+```bash
+cmake -S . -B bundle-build \
+  -DEDGEOMNI_BUILD_RELOCATABLE_BUNDLE=ON \
+  -DEDGEOMNI_RELOCATABLE_BUNDLE_PREFIX="$PWD/bundle" \
+  -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
+  -DCMAKE_CUDA_ARCHITECTURES=87
+cmake --build bundle-build -j"$(nproc)"
+cmake --build bundle-build --target install -j"$(nproc)"
+python3 scripts/verify_relocatable_bundle.py \
+  --bundle "$PWD/bundle" \
+  --manifest "$PWD/bundle/generated/bundle-manifest.json"
+```
+
+This mode builds the pinned submodule in a new build tree and installs `bin/`, `lib/`, `configs/`,
+`models/`, and `generated/`. `bin/` ELF files use `$ORIGIN/../lib`; private `lib/` ELF files use
+`$ORIGIN`. It includes `llama-embedding`, `llama-tokenize`, and the EdgeOmni host. The manifest
+records commit IDs, canonical ELF hashes/sizes, symlinks, and RPATH/ldd results. It does not copy
+models, SQLite, or configuration assets automatically. The clean-clone P0 remains open until a
+fresh checkout exercises this mode with the approved offline assets.
+
 No independent clean-clone plus offline-asset-bundle rehearsal has yet been recorded. Until that
 exercise succeeds, cross-host upstream-build portability, different JetPack compatibility, real
 model loading, CUDA behavior/performance, VLM accuracy, RAG quality, and voice-device operation

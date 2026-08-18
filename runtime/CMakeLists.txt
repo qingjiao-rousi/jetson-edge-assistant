@@ -5,28 +5,33 @@ set(EDGEOMNI_LLAMA_BUILD_DIR "${EDGEOMNI_LLAMA_UPSTREAM_DIR}/build-jetson-releas
 set(EDGEOMNI_LLAMA_INCLUDE_DIR "${EDGEOMNI_LLAMA_UPSTREAM_DIR}/include" CACHE PATH
     "Frozen llama.cpp public include directory")
 
-find_library(EDGEOMNI_LLAMA_LIBRARY NAMES llama libllama.so
-    PATHS "${EDGEOMNI_LLAMA_BUILD_DIR}/bin" NO_DEFAULT_PATH REQUIRED)
-find_library(EDGEOMNI_MTMD_LIBRARY NAMES mtmd libmtmd.so
-    PATHS "${EDGEOMNI_LLAMA_BUILD_DIR}/bin" NO_DEFAULT_PATH REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 # The frozen upstream build creates target `llama` (src/CMakeLists.txt:11-55).
 # Its build-tree package is not relocatable, so import the verified build artifact directly.
-add_library(edgeomni_llama SHARED IMPORTED GLOBAL)
-set_target_properties(edgeomni_llama PROPERTIES
-    IMPORTED_LOCATION "${EDGEOMNI_LLAMA_LIBRARY}"
-    INTERFACE_INCLUDE_DIRECTORIES
-        "${EDGEOMNI_LLAMA_INCLUDE_DIR};${EDGEOMNI_LLAMA_UPSTREAM_DIR}/ggml/include")
-add_library(edgeomni_mtmd SHARED IMPORTED GLOBAL)
-set_target_properties(edgeomni_mtmd PROPERTIES
-    IMPORTED_LOCATION "${EDGEOMNI_MTMD_LIBRARY}"
-    INTERFACE_INCLUDE_DIRECTORIES
-        "${EDGEOMNI_LLAMA_UPSTREAM_DIR}/tools/mtmd;${EDGEOMNI_LLAMA_INCLUDE_DIR};${EDGEOMNI_LLAMA_UPSTREAM_DIR}/ggml/include")
+if(EDGEOMNI_BUILD_RELOCATABLE_BUNDLE)
+    add_library(edgeomni_llama INTERFACE)
+    target_link_libraries(edgeomni_llama INTERFACE llama)
+    target_include_directories(edgeomni_llama INTERFACE "${EDGEOMNI_LLAMA_INCLUDE_DIR};${EDGEOMNI_LLAMA_UPSTREAM_DIR}/ggml/include")
+    add_library(edgeomni_mtmd INTERFACE)
+    target_link_libraries(edgeomni_mtmd INTERFACE mtmd)
+    target_include_directories(edgeomni_mtmd INTERFACE "${EDGEOMNI_LLAMA_UPSTREAM_DIR}/tools/mtmd;${EDGEOMNI_LLAMA_INCLUDE_DIR};${EDGEOMNI_LLAMA_UPSTREAM_DIR}/ggml/include")
+else()
+    find_library(EDGEOMNI_LLAMA_LIBRARY NAMES llama libllama.so PATHS "${EDGEOMNI_LLAMA_BUILD_DIR}/bin" NO_DEFAULT_PATH REQUIRED)
+    find_library(EDGEOMNI_MTMD_LIBRARY NAMES mtmd libmtmd.so PATHS "${EDGEOMNI_LLAMA_BUILD_DIR}/bin" NO_DEFAULT_PATH REQUIRED)
+    add_library(edgeomni_llama SHARED IMPORTED GLOBAL)
+    set_target_properties(edgeomni_llama PROPERTIES IMPORTED_LOCATION "${EDGEOMNI_LLAMA_LIBRARY}" INTERFACE_INCLUDE_DIRECTORIES "${EDGEOMNI_LLAMA_INCLUDE_DIR};${EDGEOMNI_LLAMA_UPSTREAM_DIR}/ggml/include")
+    add_library(edgeomni_mtmd SHARED IMPORTED GLOBAL)
+    set_target_properties(edgeomni_mtmd PROPERTIES IMPORTED_LOCATION "${EDGEOMNI_MTMD_LIBRARY}" INTERFACE_INCLUDE_DIRECTORIES "${EDGEOMNI_LLAMA_UPSTREAM_DIR}/tools/mtmd;${EDGEOMNI_LLAMA_INCLUDE_DIR};${EDGEOMNI_LLAMA_UPSTREAM_DIR}/ggml/include")
+endif()
 
-message(STATUS "EdgeOmni frozen llama include: ${EDGEOMNI_LLAMA_INCLUDE_DIR}")
-message(STATUS "EdgeOmni frozen llama library: ${EDGEOMNI_LLAMA_LIBRARY}")
-message(STATUS "EdgeOmni frozen mtmd library: ${EDGEOMNI_MTMD_LIBRARY}")
+if(EDGEOMNI_BUILD_RELOCATABLE_BUNDLE)
+    message(STATUS "EdgeOmni relocatable upstream targets: llama, mtmd")
+else()
+    message(STATUS "EdgeOmni frozen llama include: ${EDGEOMNI_LLAMA_INCLUDE_DIR}")
+    message(STATUS "EdgeOmni frozen llama library: ${EDGEOMNI_LLAMA_LIBRARY}")
+    message(STATUS "EdgeOmni frozen mtmd library: ${EDGEOMNI_MTMD_LIBRARY}")
+endif()
 
 add_library(edgeomni_runtime STATIC
     src/chat_template_renderer.cpp

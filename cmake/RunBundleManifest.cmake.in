@@ -1,0 +1,11 @@
+execute_process(
+    COMMAND "@Python3_EXECUTABLE@"
+            "@CMAKE_SOURCE_DIR@/scripts/generate_bundle_manifest.py"
+            --bundle "@CMAKE_INSTALL_PREFIX@"
+            --output "@CMAKE_INSTALL_PREFIX@/generated/bundle-manifest.json"
+    WORKING_DIRECTORY "@CMAKE_SOURCE_DIR@"
+    RESULT_VARIABLE EDGEOMNI_MANIFEST_RESULT
+)
+if(NOT EDGEOMNI_MANIFEST_RESULT EQUAL 0)
+    message(FATAL_ERROR "bundle manifest audit failed (exit ${EDGEOMNI_MANIFEST_RESULT})")
+endif()
