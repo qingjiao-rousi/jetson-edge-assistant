@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -104,6 +105,58 @@ int main_test() {
     auto bad_field = request("bad-field"); bad_field["extra"] = true; auto bad = client.Post("/v1/generate", bad_field.dump(), "application/json"); expect(bad && bad->status == 400, "unknown field");
     auto images_field = request("images-field"); images_field["images"] = json::array(); auto images = client.Post("/v1/generate", images_field.dump(), "application/json"); expect(images && images->status == 200, "empty images preserves text route compatibility");
     auto bad_hash = request("bad-hash"); bad_hash["model_sha256"] = "bad"; auto hash = client.Post("/v1/generate", bad_hash.dump(), "application/json"); expect(hash && hash->status == 400, "hash mismatch");
+    auto expect_bad_stream = [&](const char * id, const json & stream_value, const char * message) {
+        auto invalid = request(id); invalid["stream"] = stream_value;
+        const auto response = client.Post("/v1/generate", invalid.dump(), "application/json");
+        expect(response && response->status == 400 && json::parse(response->body)["error"]["code"] == "invalid_argument", message);
+    };
+    expect_bad_stream("stream-string", "true", "stream rejects string");
+    expect_bad_stream("stream-null", nullptr, "stream rejects null");
+    expect_bad_stream("stream-number", 1, "stream rejects number");
+    auto valid_sampling = request("valid-sampling"); valid_sampling["sampling"] = {{"seed", 4294967295U}, {"top_k", 100000}, {"top_p", 1.0}, {"min_p", 0.0}, {"temperature", 10.0}};
+    auto valid_sampling_response = client.Post("/v1/generate", valid_sampling.dump(), "application/json");
+    expect(valid_sampling_response && valid_sampling_response->status == 200, "valid sampling values are accepted");
+    const auto valid_sampling_request = backend->last_request();
+    expect(valid_sampling_request.sampling.seed == UINT32_MAX && valid_sampling_request.sampling.top_k == 100000 &&
+               valid_sampling_request.sampling.top_p == 1.0F && valid_sampling_request.sampling.min_p == 0.0F &&
+               valid_sampling_request.sampling.temperature == 10.0F,
+           "valid sampling values reach backend unchanged");
+    auto expect_bad_sampling = [&](const char * id, const json & sampling, const char * message) {
+        auto invalid = request(id); invalid["sampling"] = sampling;
+        const auto response = client.Post("/v1/generate", invalid.dump(), "application/json");
+        expect(response && response->status == 400 && json::parse(response->body)["error"]["code"] == "invalid_argument", message);
+    };
+    expect_bad_sampling("seed-string", {{"seed", "1"}}, "sampling rejects string seed");
+    expect_bad_sampling("seed-null", {{"seed", nullptr}}, "sampling rejects null seed");
+    expect_bad_sampling("seed-negative", {{"seed", -1}}, "sampling rejects negative seed");
+    expect_bad_sampling("seed-fraction", {{"seed", 1.5}}, "sampling rejects fractional seed");
+    expect_bad_sampling("seed-overflow", {{"seed", 4294967296ULL}}, "sampling rejects seed above uint32");
+    expect_bad_sampling("top-k-string", {{"top_k", "1"}}, "sampling rejects string top_k");
+    expect_bad_sampling("top-k-null", {{"top_k", nullptr}}, "sampling rejects null top_k");
+    expect_bad_sampling("top-k-negative", {{"top_k", -1}}, "sampling rejects negative top_k");
+    expect_bad_sampling("top-k-fraction", {{"top_k", 1.5}}, "sampling rejects fractional top_k");
+    expect_bad_sampling("top-k-overflow", {{"top_k", 100001}}, "sampling rejects top_k above limit");
+    expect_bad_sampling("top-p-string", {{"top_p", "0.5"}}, "sampling rejects string top_p");
+    expect_bad_sampling("top-p-null", {{"top_p", nullptr}}, "sampling rejects null top_p");
+    expect_bad_sampling("top-p-negative", {{"top_p", -0.1}}, "sampling rejects negative top_p");
+    expect_bad_sampling("top-p-zero", {{"top_p", 0.0}}, "sampling rejects zero top_p");
+    expect_bad_sampling("top-p-overflow", {{"top_p", 1.1}}, "sampling rejects top_p above one");
+    expect_bad_sampling("min-p-string", {{"min_p", "0.5"}}, "sampling rejects string min_p");
+    expect_bad_sampling("min-p-null", {{"min_p", nullptr}}, "sampling rejects null min_p");
+    expect_bad_sampling("min-p-negative", {{"min_p", -0.1}}, "sampling rejects negative min_p");
+    expect_bad_sampling("min-p-overflow", {{"min_p", 1.1}}, "sampling rejects min_p above one");
+    expect_bad_sampling("temperature-string", {{"temperature", "1"}}, "sampling rejects string temperature");
+    expect_bad_sampling("temperature-null", {{"temperature", nullptr}}, "sampling rejects null temperature");
+    expect_bad_sampling("temperature-negative", {{"temperature", -0.1}}, "sampling rejects negative temperature");
+    expect_bad_sampling("temperature-overflow", {{"temperature", 10.1}}, "sampling rejects temperature above limit");
+    const char * non_finite_request = R"({"request_id":"top-p-nan","messages":[{"role":"user","content":"hello"}],"max_new_tokens":8,"sampling":{"top_p":NaN}})";
+    auto nan_response = client.Post("/v1/generate", non_finite_request, "application/json");
+    expect(nan_response && nan_response->status == 400 && json::parse(nan_response->body)["error"]["code"] == "invalid_json", "sampling rejects NaN without ending service");
+    const char * infinite_request = R"({"request_id":"temperature-infinity","messages":[{"role":"user","content":"hello"}],"max_new_tokens":8,"sampling":{"temperature":Infinity}})";
+    auto infinity_response = client.Post("/v1/generate", infinite_request, "application/json");
+    expect(infinity_response && infinity_response->status == 400 && json::parse(infinity_response->body)["error"]["code"] == "invalid_json", "sampling rejects Infinity without ending service");
+    auto after_non_finite = client.Post("/v1/generate", request("after-non-finite").dump(), "application/json");
+    expect(after_non_finite && after_non_finite->status == 200, "service accepts normal request after non-finite sampling");
     auto hot_session = request("hot-session"); hot_session["session_id"] = "s"; auto session = client.Post("/v1/generate", hot_session.dump(), "application/json");
     expect(session && session->status == 200 && json::parse(session->body)["session_id"] == "s", "non-empty session accepted and echoed");
     auto hot_session_again = request("hot-session-again"); hot_session_again["session_id"] = "s"; auto session_again = client.Post("/v1/chat", hot_session_again.dump(), "application/json");

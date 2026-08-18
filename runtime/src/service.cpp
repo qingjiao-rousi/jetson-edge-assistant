@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
@@ -17,6 +18,9 @@ namespace edgeomni {
 namespace {
 using json = nlohmann::json;
 constexpr size_t kCompletedRequestIdCapacity = 256;
+// EdgeOmni HTTP API defensive bounds, not llama.cpp-omni sampler limits.
+constexpr uint64_t kMaxTopK = 100000;
+constexpr double kMaxTemperature = 10.0;
 
 int http_code(RuntimeErrorCode code) {
     switch (code) {
@@ -99,6 +103,28 @@ bool decode_base64_strict(const std::string & input, uint64_t maximum, std::vect
     return true;
 }
 
+bool get_nonnegative_integer(const json & value, uint64_t maximum, uint64_t * output) {
+    if (value.is_number_unsigned()) {
+        const uint64_t parsed = value.get<uint64_t>();
+        if (parsed > maximum) return false;
+        *output = parsed;
+        return true;
+    }
+    if (!value.is_number_integer()) return false;
+    const int64_t parsed = value.get<int64_t>();
+    if (parsed < 0 || static_cast<uint64_t>(parsed) > maximum) return false;
+    *output = static_cast<uint64_t>(parsed);
+    return true;
+}
+
+bool get_finite_float(const json & value, double minimum, double maximum, float * output) {
+    if (!value.is_number()) return false;
+    const double parsed = value.get<double>();
+    if (!std::isfinite(parsed) || parsed < minimum || parsed > maximum) return false;
+    *output = static_cast<float>(parsed);
+    return std::isfinite(*output);
+}
+
 bool parse_request(const json & body, GenerateRequest * request, bool * stream, const std::string & expected_hash,
                   std::string * error) {
     if (!body.is_object() || !has_only(body, {"request_id", "session_id", "messages", "max_new_tokens", "timeout_ms", "stream", "model_sha256", "sampling", "images"})) {
@@ -120,13 +146,24 @@ bool parse_request(const json & body, GenerateRequest * request, bool * stream, 
     if (!body.contains("max_new_tokens") || !body["max_new_tokens"].is_number_unsigned() || body["max_new_tokens"].get<uint64_t>() == 0 || body["max_new_tokens"].get<uint64_t>() > UINT32_MAX) { *error = "invalid max_new_tokens"; return false; }
     request->max_new_tokens = body["max_new_tokens"].get<uint32_t>();
     if (body.contains("timeout_ms")) { if (!body["timeout_ms"].is_number_unsigned() || body["timeout_ms"].get<uint64_t>() > UINT64_MAX) { *error = "invalid timeout_ms"; return false; } request->timeout_ms = body["timeout_ms"].get<uint64_t>(); }
+    if (body.contains("stream") && !body["stream"].is_boolean()) { *error = "invalid stream"; return false; }
     *stream = body.value("stream", false);
     if (body.contains("model_sha256") && (!body["model_sha256"].is_string() || body["model_sha256"].get<std::string>() != expected_hash)) { *error = "model_sha256 mismatch"; return false; }
     if (body.contains("sampling")) {
         const auto & s = body["sampling"]; if (!s.is_object() || !has_only(s, {"seed", "top_k", "top_p", "min_p", "temperature"})) { *error = "invalid sampling"; return false; }
-        if (s.contains("seed") && !s["seed"].is_number_integer()) { *error = "invalid seed"; return false; } if (s.contains("seed")) request->sampling.seed = s["seed"].get<uint32_t>();
-        if (s.contains("top_k") && (!s["top_k"].is_number_integer() || s["top_k"].get<int64_t>() < 0)) { *error = "invalid top_k"; return false; } if (s.contains("top_k")) request->sampling.top_k = s["top_k"].get<int32_t>();
-        if (s.contains("top_p")) request->sampling.top_p = s["top_p"].get<float>(); if (s.contains("min_p")) request->sampling.min_p = s["min_p"].get<float>(); if (s.contains("temperature")) request->sampling.temperature = s["temperature"].get<float>();
+        uint64_t integer_value = 0;
+        if (s.contains("seed")) {
+            if (!get_nonnegative_integer(s["seed"], UINT32_MAX, &integer_value)) { *error = "invalid seed"; return false; }
+            request->sampling.seed = static_cast<uint32_t>(integer_value);
+        }
+        if (s.contains("top_k")) {
+            if (!get_nonnegative_integer(s["top_k"], kMaxTopK, &integer_value)) { *error = "invalid top_k"; return false; }
+            request->sampling.top_k = static_cast<int32_t>(integer_value);
+        }
+        if (s.contains("top_p") && !get_finite_float(s["top_p"], 0.0, 1.0, &request->sampling.top_p)) { *error = "invalid top_p"; return false; }
+        if (s.contains("top_p") && request->sampling.top_p <= 0.0F) { *error = "invalid top_p"; return false; }
+        if (s.contains("min_p") && !get_finite_float(s["min_p"], 0.0, 1.0, &request->sampling.min_p)) { *error = "invalid min_p"; return false; }
+        if (s.contains("temperature") && !get_finite_float(s["temperature"], 0.0, kMaxTemperature, &request->sampling.temperature)) { *error = "invalid temperature"; return false; }
     }
     if (body.contains("images")) {
         if (!body["images"].is_array() || body["images"].size() > 1U) { *error = "images must contain at most one item"; return false; }
@@ -184,15 +221,19 @@ RuntimeService::RuntimeService(std::shared_ptr<RuntimeBackend> backend) : impl_(
         json body; try { body = json::parse(req.body); } catch (...) { res.status = 400; res.set_content(R"({"error":{"code":"invalid_json","message":"invalid JSON"}})", "application/json"); return; }
         // M8.1 application-facing single-image diagnosis contract. It normalizes
         // into the existing RuntimeService request shape; image decoding remains shared.
-        if (application_diagnosis_route) {
-            if (!body.is_object() || !has_only(body, {"request_id", "prompt", "images", "stream"}) || !body.contains("prompt") || !body["prompt"].is_string() || !body.contains("images")) {
-                res.status = 400; res.set_content(R"({"error":{"code":"invalid_argument","message":"invalid diagnosis request"}})", "application/json"); return;
-            }
-            json normalized = {{"request_id", body.value("request_id", "diagnose-image")}, {"messages", {{{"role", "user"}, {"content", body["prompt"]}}}}, {"images", body["images"]}, {"max_new_tokens", static_cast<uint32_t>(128)}, {"stream", body.value("stream", false)}};
-            body = std::move(normalized);
-        }
         GenerateRequest request; bool stream = false; std::string error;
-        if (!parse_request(body, &request, &stream, impl_->config.model_sha256, &error)) { res.status = 400; res.set_content(json({{"error", {{"code", "invalid_argument"}, {"message", error}}}}).dump(), "application/json"); return; }
+        try {
+            if (application_diagnosis_route) {
+                if (!body.is_object() || !has_only(body, {"request_id", "prompt", "images", "stream"}) || !body.contains("prompt") || !body["prompt"].is_string() || !body.contains("images")) {
+                    res.status = 400; res.set_content(R"({"error":{"code":"invalid_argument","message":"invalid diagnosis request"}})", "application/json"); return;
+                }
+                json normalized = {{"request_id", body.value("request_id", "diagnose-image")}, {"messages", {{{"role", "user"}, {"content", body["prompt"]}}}}, {"images", body["images"]}, {"max_new_tokens", static_cast<uint32_t>(128)}, {"stream", body.value("stream", false)}};
+                body = std::move(normalized);
+            }
+            if (!parse_request(body, &request, &stream, impl_->config.model_sha256, &error)) { res.status = 400; res.set_content(json({{"error", {{"code", "invalid_argument"}, {"message", error}}}}).dump(), "application/json"); return; }
+        } catch (const json::exception &) {
+            error_response(res, 400, "invalid_argument", "invalid request value"); return;
+        }
         { std::lock_guard<std::mutex> l(impl_->mutex); if (!impl_->initialized || impl_->stopping) { error_response(res, 503, "unavailable", "service is not ready"); return; } if (impl_->active == request.request_id || impl_->completed_request_ids.count(request.request_id)) { error_response(res, 409, "duplicate_request_id", "request_id is active or recently completed"); return; } if (!impl_->active.empty()) { error_response(res, 429, "busy", "another request is active"); return; } impl_->active = request.request_id; impl_->accepted.fetch_add(1); }
         if (stream) { res.set_chunked_content_provider("text/event-stream", [this, request](size_t, httplib::DataSink & sink) mutable { bool disconnected = false; bool got_token = false; uint64_t first_write = 0; uint64_t last_write = 0; const auto accepted_at = std::chrono::steady_clock::now(); auto emit = [&](const char * event, const json & data) { if (disconnected) return false; const std::string payload = std::string("event: ") + event + "\ndata: " + data.dump() + "\n\n"; if (!sink.write(payload.data(), payload.size())) { disconnected = true; request.cancel_flag->store(true); return false; } return true; }; emit("metadata", json({{"request_id", request.request_id}, {"session_id", request.session_id.empty() ? json(nullptr) : json(request.session_id)}, {"image_tokens", nullptr}, {"image_metrics", {{"image_preprocess_ms", nullptr}, {"vision_encode_ms", nullptr}, {"image_embedding_ms", nullptr}}}, {"measurement_status", "not_measured_before_backend"}})); GenerateResponse out = impl_->backend->generate_text(request, [&](const StreamToken & t) { const bool written = emit("token", json({{"request_id", t.request_id}, {"session_id", request.session_id.empty() ? json(nullptr) : json(request.session_id)}, {"index", t.index}, {"text", t.text}})); if (written) { const uint64_t now = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - accepted_at).count()); if (!got_token) { first_write = now; got_token = true; } last_write = now; impl_->token_count.fetch_add(1); } return written; }); if (!disconnected) { const char * event = out.finish_reason == "cancelled" ? "cancelled" : out.finish_reason == "timeout" ? "timeout" : out.code == RuntimeErrorCode::kOk ? "done" : "error"; emit(event, response_json(out, impl_->config.model_sha256)); } { std::lock_guard<std::mutex> l(impl_->mutex); impl_->last_service_ttft_ms = got_token ? first_write : 0; impl_->last_service_tpot_ms = got_token && out.generated_tokens > 1 ? (last_write - first_write) / (out.generated_tokens - 1) : 0; } impl_->finish(out); sink.done(); return true; }); res.set_header("Cache-Control", "no-cache"); res.set_header("Connection", "keep-alive"); return; }
         GenerateResponse out = impl_->backend->generate_text(request); impl_->finish(out); res.status = out.code == RuntimeErrorCode::kOk ? 200 : http_code(out.code); res.set_content(response_json(out, impl_->config.model_sha256).dump(), "application/json");
