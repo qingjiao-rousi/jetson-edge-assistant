@@ -133,7 +133,7 @@ cancel/timeout/prefill/decode/rollback failure
 
 任何一项未通过时不得进入正式性能报告。
 
-真实 Runtime 的失效矩阵由 `scripts/validate_mtmd_prefix_reuse.py` 执行。它在独立 disabled/hot Runtime 进程间比较 cold/exact/branch 输出，并在 hot Runtime 内验证 session switch、单图请求、timeout、HTTP cancel 和 `POST /v1/context/reset` 后下一文本请求为 cold。该 reset 路由只允许服务空闲时调用；它是实验和运维诊断接口，不是多用户会话 API。
+真实 Runtime 的失效矩阵由 `scripts/validate_mtmd_prefix_reuse.py` 执行。它从 disabled/hot Runtime 配置读取并比对 `batch_tokens`，在独立 Runtime 进程间比较 cold/exact/branch 输出；exact/branch 的实际 `prompt_tokens < batch_tokens` 时要求零 hit、全量 miss 并分类为 `PASS_EXPECTED_NO_REUSE`，达到 batch 时要求正 hit 并分类为 `PASS_REUSE`。JSON 结果记录 batch 与两条分类。在 hot Runtime 内它仍验证 session switch、单图请求、timeout、HTTP cancel 和 `POST /v1/context/reset` 后下一文本请求为 cold。该 reset 路由只允许服务空闲时调用；它是实验和运维诊断接口，不是多用户会话 API。
 
 ```bash
 python3 - <<'PY'

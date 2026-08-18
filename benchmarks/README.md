@@ -24,6 +24,6 @@ Clean-commit Q4/Q8 locked-clock text, fixed single-image end-to-end, structured 
 
 The collector consumes a complete Assistant config, starts the matching `MtmdBackend` Runtime once, performs one warm-up plus measured HTTP requests, and stops the Runtime. Text mode uses the configured chat endpoint; `--image` uses the fixed single-image diagnosis endpoint and binds the repository fixture by SHA-256 without writing its base64 payload to raw results. It intentionally does not pass Qwen2.5-VL assets to the Qwen3-only DirectBackend runner.
 
-For Prefix Reuse correctness rather than latency collection, use `scripts/validate_mtmd_prefix_reuse.py`. It emits a local JSON pass/fail matrix for exact/branch reuse and invalidation recovery; it is not a benchmark summary.
+For Prefix Reuse correctness rather than latency collection, use `scripts/validate_mtmd_prefix_reuse.py`. It reads the matching Runtime `batch_tokens`, emits exact/branch classifications (`PASS_EXPECTED_NO_REUSE` below the batch boundary or `PASS_REUSE` at/above it), and validates invalidation recovery; it is not a benchmark summary.
 
 The single-hot text policy retains only complete cold-prefill batches. With the current 512-token batch/ubatch, an actual Runtime prompt below 512 has no safe reusable batch: zero hot hits are `PASS_EXPECTED_NO_REUSE` when all cold-path correctness gates pass. Such a row belongs in coverage/correctness reporting but is excluded from Prefix Reuse latency-gain statistics.

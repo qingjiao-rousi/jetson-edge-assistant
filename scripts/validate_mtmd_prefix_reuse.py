@@ -120,6 +120,54 @@ def metrics(response: dict[str, Any]) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def classify_prefix_reuse(response: dict[str, Any], batch_tokens: int) -> dict[str, Any]:
+    """Classify single-hot cache telemetry against the configured batch boundary.
+
+    The Runtime can safely retain only complete cold-prefill batches.  Therefore
+    an otherwise-correct prompt shorter than ``batch_tokens`` is expected to
+    have no reusable prefix rather than being treated as a reuse failure.
+    """
+    telemetry = metrics(response)
+    prompt_tokens = response.get("prompt_tokens")
+    hit_tokens = telemetry.get("cache_hit_tokens")
+    miss_tokens = telemetry.get("cache_miss_tokens")
+    result: dict[str, Any] = {
+        "batch_tokens": batch_tokens,
+        "prompt_tokens": prompt_tokens,
+        "cache_hit_tokens": hit_tokens,
+        "cache_miss_tokens": miss_tokens,
+        "classification": "FAIL",
+        "reason": "",
+    }
+    if not isinstance(batch_tokens, int) or isinstance(batch_tokens, bool) or batch_tokens <= 0:
+        result["reason"] = "invalid batch_tokens"
+        return result
+    numeric_values = (prompt_tokens, hit_tokens, miss_tokens)
+    if any(not isinstance(value, int) or isinstance(value, bool) for value in numeric_values):
+        result["reason"] = "prompt/cache telemetry must be integer tokens"
+        return result
+    if prompt_tokens < 0 or hit_tokens < 0 or miss_tokens < 0:
+        result["reason"] = "prompt/cache telemetry must be non-negative"
+        return result
+    if hit_tokens > prompt_tokens:
+        result["reason"] = "cache_hit_tokens exceeds prompt_tokens"
+        return result
+    if hit_tokens + miss_tokens != prompt_tokens:
+        result["reason"] = "cache_hit_tokens + cache_miss_tokens != prompt_tokens"
+        return result
+    if prompt_tokens < batch_tokens:
+        if hit_tokens == 0 and miss_tokens == prompt_tokens:
+            result["classification"] = "PASS_EXPECTED_NO_REUSE"
+        else:
+            result["reason"] = "prompt below batch boundary must have zero hit and full miss"
+        return result
+    if hit_tokens > 0:
+        result["classification"] = "PASS_REUSE"
+    else:
+        result["reason"] = "prompt at or above batch boundary must have a positive cache hit"
+    return result
+
+
 def run_disabled(config: dict[str, Any], prompt: str, label: str) -> dict[str, Any]:
     with RuntimeProcess(config):
         status, response = chat(config, f"cold-{label}-{uuid.uuid4().hex}", prompt, "cold-session")
@@ -149,6 +197,14 @@ def main() -> int:
     disabled, hot = load_config(args.disabled_config), load_config(args.hot_config)
     if disabled["runtime"]["prefix_reuse"] != "disabled" or hot["runtime"]["prefix_reuse"] != "single_hot_text":
         parser.error("configs must explicitly use disabled and single_hot_text")
+    disabled_batch = disabled["runtime"].get("batch_tokens")
+    hot_batch = hot["runtime"].get("batch_tokens")
+    if (not isinstance(disabled_batch, int) or isinstance(disabled_batch, bool) or disabled_batch <= 0 or
+            not isinstance(hot_batch, int) or isinstance(hot_batch, bool) or hot_batch <= 0):
+        parser.error("configs must define a positive integer runtime.batch_tokens")
+    if disabled_batch != hot_batch:
+        parser.error("disabled and single_hot_text configs must use the same runtime.batch_tokens")
+    batch_tokens = hot_batch
     for config in (disabled, hot): check_runtime_assets(config)
 
     cold_exact = run_disabled(disabled, prompt, "exact")
@@ -158,18 +214,16 @@ def main() -> int:
         status, warm = chat(hot, f"warm-{uuid.uuid4().hex}", prompt, "alpha")
         checks.append(require(status == 200 and warm.get("error") is None, "warm_text"))
         status, exact = chat(hot, f"exact-{uuid.uuid4().hex}", prompt, "alpha")
-        exact_metrics = metrics(exact)
+        exact_reuse = classify_prefix_reuse(exact, batch_tokens)
         checks += [
-            require(status == 200 and exact.get("text") == cold_exact.get("text"), "exact_output_matches_cold"),
-            require(exact_metrics.get("cache_hit_tokens", 0) > 0, "exact_has_cache_hit", str(exact_metrics)),
-            require(exact_metrics.get("cache_hit_tokens", 0) + exact_metrics.get("cache_miss_tokens", 0) == exact.get("prompt_tokens"), "exact_cache_accounting"),
+            require(status == 200 and exact.get("error") is None and exact.get("text") == cold_exact.get("text"), "exact_output_matches_cold"),
+            require(exact_reuse["classification"] != "FAIL", "exact_prefix_reuse_classification", json.dumps(exact_reuse, sort_keys=True)),
         ]
         status, branch_hot = chat(hot, f"branch-{uuid.uuid4().hex}", branch, "alpha")
-        branch_metrics = metrics(branch_hot)
+        branch_reuse = classify_prefix_reuse(branch_hot, batch_tokens)
         checks += [
-            require(status == 200 and branch_hot.get("text") == cold_branch.get("text"), "branch_output_matches_cold"),
-            require(branch_metrics.get("cache_hit_tokens", 0) > 0, "branch_has_cache_hit", str(branch_metrics)),
-            require(branch_metrics.get("cache_hit_tokens", 0) + branch_metrics.get("cache_miss_tokens", 0) == branch_hot.get("prompt_tokens"), "branch_cache_accounting"),
+            require(status == 200 and branch_hot.get("error") is None and branch_hot.get("text") == cold_branch.get("text"), "branch_output_matches_cold"),
+            require(branch_reuse["classification"] != "FAIL", "branch_prefix_reuse_classification", json.dumps(branch_reuse, sort_keys=True)),
         ]
         status, switched = chat(hot, f"switch-{uuid.uuid4().hex}", prompt, "beta")
         switched_metrics = metrics(switched)
@@ -212,10 +266,12 @@ def main() -> int:
         status, after_reset = chat(hot, f"after-reset-{uuid.uuid4().hex}", prompt, "alpha")
         checks.append(require(status == 200 and metrics(after_reset).get("cache_hit_tokens") == 0, "reset_invalidates_text_kv", str(metrics(after_reset))))
 
-    report = {"schema_version": 1, "status": "PASS" if all(item["passed"] for item in checks) else "FAIL",
+    report = {"schema_version": 2, "status": "PASS" if all(item["passed"] for item in checks) else "FAIL",
               "disabled_config": args.disabled_config, "hot_config": args.hot_config,
               "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(),
-              "branch_prompt_sha256": __import__("hashlib").sha256(branch.encode()).hexdigest(), "checks": checks}
+              "branch_prompt_sha256": __import__("hashlib").sha256(branch.encode()).hexdigest(),
+              "prefix_reuse": {"batch_tokens": batch_tokens, "exact": exact_reuse, "branch": branch_reuse},
+              "checks": checks}
     encoded = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         output = pathlib.Path(args.output).resolve()
