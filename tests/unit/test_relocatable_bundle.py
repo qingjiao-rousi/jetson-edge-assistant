@@ -12,6 +12,7 @@ def load(name):
     module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module); return module
 
 VERIFY = load('verify_relocatable_bundle')
+GENERATE = load('generate_bundle_manifest')
 
 class Result:
     def __init__(self, text='', code=0): self.stdout, self.returncode = text, code
@@ -45,7 +46,9 @@ class RelocatableBundleTest(unittest.TestCase):
         self.assertEqual(self.verify(ldd='libllama.so => not found\n'),1)
         self.assertEqual(self.verify(ldd='libllama.so => /tmp/libllama.so\n'),1)
         self.assertEqual(self.verify(ldd='libllama.so => '+str(self.root/'bin'/'..'/'lib'/'libllama.so')+'\n'),0)
-        self.assertEqual(self.verify(ldd='libllama.so => /home/nvidia/Desktop/llm/vlmllm-main/libllama.so\n'),1)
+        self.assertEqual(self.verify(ldd='libllama.so => /tmp/another-clone/lib/libllama.so\n'),1)
+        self.assertIn('private dependency outside bundle/lib', GENERATE.ldd_failures(
+            'libllama.so => /tmp/another-clone/lib/libllama.so\n', self.root))
     def test_manifest_paths_sets_hashes_and_links_fail(self):
         m=self.manifest(); m['canonical_elf'][0]['path']='../escape'; self.assertEqual(self.verify(m),1)
         m=self.manifest(); m['canonical_elf'].pop(); self.assertEqual(self.verify(m),1)

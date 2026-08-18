@@ -5,7 +5,6 @@ import argparse, hashlib, json, os, pathlib, subprocess, sys
 import re
 
 PRIVATE = ("libggml", "libllama", "libmtmd", "libomni")
-REPO_ROOT = pathlib.Path("/home/nvidia/Desktop/llm/vlmllm-main").resolve()
 
 def ldd_failures(output: str, root: pathlib.Path) -> list[str]:
     failures=[]; allowed=(root / "lib").resolve()
@@ -15,8 +14,7 @@ def ldd_failures(output: str, root: pathlib.Path) -> list[str]:
         if not match: continue
         candidate=pathlib.Path(match.group(1)).resolve(strict=False)
         if any(name in line for name in PRIVATE):
-            if candidate == REPO_ROOT or REPO_ROOT in candidate.parents: failures.append("repository path")
-            elif allowed not in candidate.parents and candidate != allowed: failures.append("private dependency outside bundle/lib")
+            if allowed not in candidate.parents and candidate != allowed: failures.append("private dependency outside bundle/lib")
     return failures
 
 def sha256(path: pathlib.Path) -> str:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 import argparse, hashlib, json, os, pathlib, subprocess, sys
 import re
-PRIVATE=('libggml','libllama','libmtmd','libomni'); REPO_ROOT=pathlib.Path('/home/nvidia/Desktop/llm/vlmllm-main').resolve()
+PRIVATE=('libggml','libllama','libmtmd','libomni')
 def ldd_failures(output, root):
  allowed=(root/'lib').resolve(); errors=[]
  for line in output.splitlines():
@@ -12,8 +12,7 @@ def ldd_failures(output, root):
   if not m: continue
   candidate=pathlib.Path(m.group(1)).resolve(strict=False)
   if any(name in line for name in PRIVATE):
-   if candidate==REPO_ROOT or REPO_ROOT in candidate.parents: errors.append('repository path')
-   elif candidate!=allowed and allowed not in candidate.parents: errors.append('private dependency outside bundle/lib')
+   if candidate!=allowed and allowed not in candidate.parents: errors.append('private dependency outside bundle/lib')
  return errors
 def digest(p):
  h=hashlib.sha256()
