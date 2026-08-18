@@ -62,14 +62,14 @@ scripts/run_jetson_benchmark.sh \
 
 ## KV Prefix reuse 方法
 
-当前方法和 runner 对应 `DirectBackend` 的冻结 Qwen3 验证路径，不是 Qwen2.5-VL `MtmdBackend` 已完成的性能证据。真实 VLM Runtime 的接入、正确性门和长 prompt A/B 协议见 [深入优化路线](optimization-roadmap.md)；完成前不得把本节结果外推到 Assistant/RAG 主路径。
+本节 runner 对应 `DirectBackend` 的冻结 Qwen3 历史验证路径，不能作为 Qwen2.5-VL `MtmdBackend` 的性能证据。真实 VLM Runtime 的 text-only 单热 Prefix reuse 已整合到 `main`；其正确性门、长 prompt A/B 协议和已验证边界见 [深入优化路线](optimization-roadmap.md)。它只保留一个 hot text session，按完整 batch 边界复用；RAG/Agent 尚未向 Runtime 传递 `session_id`，不得把任一结果外推为 RAG 主路径或多用户缓存收益。
 
 使用 `edgeomni_qwen3_benchmark_runner --session-id ... --prompt-2 ...` 固定同一 session：
 
 - cold：第一条完整 prompt；
 - exact/LCP：第二条相同或共享长前缀 prompt；
 - branch：第三条共享前缀但末尾分叉的 prompt；
-- invalidation：另测 session 切换、图像请求、取消、超时或 decode 失败后的 cache miss。
+- invalidation：另测 session 切换、图像请求、取消、超时、reset 或 decode 失败后的 cache miss。
 
 必须报告 `cache_hit_tokens`、`cache_miss_tokens`、`cache_hit_ratio`、`prefill_ms` 和 `cache_invalidation_reason`。只允许表述为“单热 session Token LCP Prefix reuse”，不得称作多用户缓存、paged KV、LRU/TTL 或生产缓存系统。
 

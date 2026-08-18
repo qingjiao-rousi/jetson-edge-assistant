@@ -35,15 +35,9 @@
 
 ## 必须先澄清的 KV 边界
 
-当前仓库已有 Token LCP Prefix reuse，但它位于 `DirectBackend` 的冻结 Qwen3 验证路径：
+`DirectBackend` 的冻结 Qwen3 验证路径仍保留历史实现；实际 Qwen2.5-VL 服务路径的 `runtime/src/mtmd_backend.cpp` 已将 text-only 单热 Token LCP Prefix reuse 整合到 `main`。它保存一个 hot text session 的 prompt tokens，按完整 cold-prefill batch 边界复用，并在图像请求、session 切换、timeout、cancel 或 reset 时失效。`app/qa/manual_qa.py` 的 RAG 模型请求当前仍发送 `session_id: null`，因此该 Runtime 能力不是 RAG/Agent session 集成。
 
-- `runtime/src/direct_backend.cpp`：已有 token LCP、KV 范围删除、prompt KV 保留及异常失效。
-- `runtime/src/mtmd_backend.cpp`：实际 Qwen2.5-VL 服务路径仍在每次请求退出时清空 llama memory。
-- `app/qa/manual_qa.py`：当前 RAG 模型请求发送 `session_id: null`。
-
-因此，基线只能声称“已有单热 Prefix reuse 原型和合同”，不能声称“实际 Qwen2.5-VL/RAG 主路径已经从 Prefix reuse 获得 Prefill/TTFT 收益”。OPT-1 的目标正是补齐并验证这一点。
-
-底层 KV memory、KV 存储格式和相关 API 由 `llama.cpp-omni` 提供。EdgeOmni 拟实现的是 Runtime 层的 token LCP、KV 保留/回滚、生命周期、失效策略、观测合同和实机验证；不得包装成自研通用 KV Cache、Paged Attention 或多用户缓存。
+底层 KV memory、KV 存储格式和相关 API 由 `llama.cpp-omni` 提供。EdgeOmni 实现的是 Runtime 层的 token LCP、KV 保留/回滚、生命周期、失效策略和观测合同；不得包装成自研通用 KV Cache、Paged Attention 或多用户缓存。
 
 ## 总体执行顺序
 
@@ -66,7 +60,7 @@
 
 ### 设计
 
-当前实现已落在 `runtime/src/mtmd_backend.cpp`，由 `RuntimeConfig.prefix_reuse_mode` 控制；默认值和现有公开配置均为 `disabled`。`single_hot_text` 只通过显式配置启用。709-token Q4 exact prompt 已有 reviewed Prefill/TTFT 收益；该收益不外推到其他输入或会话模型。
+当前实现已落在 `runtime/src/mtmd_backend.cpp`，由 `RuntimeConfig.prefix_reuse_mode` 控制；默认配置为 `disabled`，`configs/assistant-prefix-single-hot.json` 以显式 `single_hot_text` 启用。709-token Q4 exact prompt 已有 reviewed Prefill/TTFT 收益；该收益不外推到其他输入或会话模型。
 
 本地检查入口：
 
@@ -114,7 +108,7 @@ cancel/timeout/prefill/decode/rollback failure
 实现步骤：
 
 1. 从 text-only `mtmd_input_chunks` 取得并拼接 `llama_token`。
-2. 保存一个 hot session 的 `session_id`、prompt tokens、模型/模板/Runtime 配置 fingerprint。
+2. `MtmdBackend` 只保存一个 hot session 的 `session_id` 和 prompt tokens；本实现不保存模型、模板或 Runtime 配置 fingerprint。`DirectBackend` 的独立 fingerprint 逻辑不属于此处的 `MtmdBackend` 状态。
 3. 计算新旧 token LCP，并向下对齐到完整 cold-prefill batch；exact prompt 也重新计算最后一个完整或尾部 cold batch，保持产生 logits 的 batch 形状。
 4. 使用上游 `llama_memory_seq_rm()` 删除 `[aligned LCP, end)`，从对齐后的 LCP 开始构造 text batch。
 5. 成功生成后删除 `[prompt_tokens, end)`，保留完整 prompt KV。

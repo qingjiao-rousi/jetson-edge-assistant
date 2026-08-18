@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | 平台 | Jetson AGX Orin、ARM64、CUDA Release 构建 | 37/37 layer CUDA offload 已记录 |
 | 量化 | Q4_K_M 与 Q8_0，各 15 次有效基线测量 | Q4 为部署优先候选；Q8 为对照 |
-| KV | `DirectBackend` 的文本单热 session 合同 | Token LCP、分叉/回滚与异常失效已有代码；Qwen2.5-VL `MtmdBackend` 主路径接入及 Prefill/TTFT 收益尚未实测 |
+| KV | Qwen2.5-VL `MtmdBackend` 的 text-only 单热 session 合同 | 已整合 Token LCP、完整 batch 边界复用、分叉/回滚与 session/image/timeout/cancel/reset 失效；只保留一个 hot session，不是多用户缓存，RAG/Agent 尚未传递 Runtime `session_id` |
 | VLM | 固定 Qwen2.5-VL 主模型/MMProj、单图 API | Q4/Q8 固定单图 E2E 已验证；不宣称准确率、通用多图/视频能力 |
 | RAG | SQLite/FTS5 hybrid、引用和拒答门禁 | M9.1B R2.5 为 PARTIAL，最终质量门未通过 |
 

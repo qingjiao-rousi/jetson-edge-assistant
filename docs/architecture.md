@@ -18,7 +18,7 @@ flowchart TB
         RAG[Hybrid RAG\nSQLite/FTS5 + embedding]
         GATE[设备/故障码约束\n引用与拒答门禁]
         HTTP[C++ HTTP/JSON/SSE Service\nready + timeout + cancel]
-        ADAPTER[Text/VLM Backend Adapter\nDirectBackend 单热 Prefix reuse\nMtmdBackend 当前 cold-per-request]
+        ADAPTER[Text/VLM Backend Adapter\nMtmdBackend text-only 单热 Prefix reuse]
     end
 
     subgraph Upstream[llama.cpp-omni 上游]
@@ -50,12 +50,12 @@ flowchart TB
 | 模型加载、tokenizer、sampler | `llama.cpp-omni` | 配置参数、生命周期封装、错误映射 | `runtime/src/direct_backend.cpp` |
 | 图像 embedding/`mtmd` | `llama.cpp-omni` | 单图输入校验、适配和 API 合同 | `runtime/src/mtmd_backend.cpp`、`vlm_input_validator.cpp` |
 | HTTP/JSON/SSE、ready、取消/超时 | **EdgeOmni** | 请求校验、状态/错误、SSE 事件、单活动请求保护 | `runtime/src/service.cpp` |
-| 单热 KV Prefix reuse 原型 | **EdgeOmni 对上游 KV API 的状态管理** | `DirectBackend` 已实现 Token LCP、prompt KV 保留、分叉/异常失效；`MtmdBackend` 尚未接入 | `runtime/src/direct_backend.cpp`、`docs/optimization-roadmap.md` |
+| 单热 KV Prefix reuse | **EdgeOmni 对上游 KV API 的状态管理** | `MtmdBackend` 已实现 text-only Token LCP、完整 batch 边界复用、prompt KV 保留、分叉/异常失效；只保留一个 hot session | `runtime/src/mtmd_backend.cpp`、`configs/assistant-prefix-single-hot.json` |
 | Hybrid RAG 与门禁 | **EdgeOmni** | SQLite/FTS5 hybrid、约束、无证据短路、引用合同 | `app/retrieval/`、`app/qa/manual_qa.py` |
 | Agent/Session/适配器 | **EdgeOmni** | 有界只读工具、SessionStore、citation gate、终端/JSONL/语音适配 | `app/agent/`、`app/assistant/`、`app/audio/` |
 | Qwen 模型与 embedding 权重 | 外部资产 | 记录来源、revision、大小、SHA-256；仓库不分发 | `configs/assistant.json`、`configs/embedding.json` |
 
-“EdgeOmni 的 KV Prefix reuse”准确含义是：EdgeOmni 调用上游 KV memory API，管理一个文本 hot session 的 prompt token 前缀；它不是重新实现底层 KV Cache，也不是多会话调度或分页缓存。当前这一实现只在 `DirectBackend` 验证路径成立；实际 Qwen2.5-VL `MtmdBackend` 每个请求结束仍清空 llama memory，接入与实测计划见 [深入优化路线](optimization-roadmap.md)。
+“EdgeOmni 的 KV Prefix reuse”准确含义是：`MtmdBackend` 调用 `llama.cpp-omni` 的底层 KV memory/API，管理一个 text-only hot session 的 prompt token 前缀，并按完整 batch 边界复用；它不是重新实现底层 KV Cache，也不是多会话调度、分页缓存或多用户缓存。图像请求、session 切换、timeout、cancel 和 reset 会使该状态失效；RAG/Agent 当前尚未向 Runtime 传递 `session_id`。实现和实测边界见 [深入优化路线](optimization-roadmap.md)。
 
 ## 单热 KV 状态边界
 
@@ -69,7 +69,7 @@ stateDiagram-v2
     Reuse --> Cold: cancel / timeout / decode 或回滚失败
 ```
 
-该状态图描述 `DirectBackend` 已有合同以及 `MtmdBackend` 的目标设计，不表示 Qwen2.5-VL 主路径已经命中。Runtime service 同时只接受一个活动请求，忙时返回 429。Agent 可保存最多 8 个逻辑 session，但这些 session 不等于 Runtime 层的多 session KV；当前 RAG 模型请求也未向 Runtime 传递 session ID。
+该状态图描述已整合到 Qwen2.5-VL `MtmdBackend` 主路径的 text-only 单热合同。Runtime service 同时只接受一个活动请求，忙时返回 429。Agent 可保存最多 8 个逻辑 session，但这些 session 不等于 Runtime 层的多 session KV；当前 RAG 模型请求也未向 Runtime 传递 session ID。
 
 ## 配置合同
 

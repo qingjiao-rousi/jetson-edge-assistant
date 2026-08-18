@@ -2,7 +2,7 @@
 
 - Runtime 目标是 Jetson AGX Orin ARM64/CUDA 的本地离线原型；Docker、systemd、生产鉴权、高并发和长稳验证尚未实现。
 - RAG 的 M9.1B R2.5 holdout 已消费。该结果为 PARTIAL，不能重跑、修改或用于调参，不能表述为最终质量门通过。
-- M10.1 的单热文本 KV Prefix reuse 当前只在 `DirectBackend` 验证路径实现。实际 Qwen2.5-VL `MtmdBackend` 仍在每次请求后清空 llama memory，RAG 模型调用也发送空 Runtime session；因此尚无主路径 Prefill/TTFT 收益证据。深入优化计划不包含多用户 KV Cache、LRU/TTL、跨进程共享或持久化。
+- M10.1 的单热文本 KV Prefix reuse 已整合到实际 Qwen2.5-VL `MtmdBackend`：它只保留一个 hot text session，并按完整 batch 边界复用。图像请求、session 切换、timeout、cancel 和 reset 会失效；底层 KV memory/API 由 `llama.cpp-omni` 提供。RAG/Agent 尚未向 Runtime 传递 `session_id`，因此不能把该机制描述为 RAG 主路径收益、多用户 KV Cache、LRU/TTL、跨进程共享或持久化。
 - M10.2 只实现有界进程内 Agent/session、只读工具和 citation 门禁；没有身份认证或跨重启状态。Runtime 与 Agent 都只记录最近 256 个已完成 request-id：活动或仍在记录内的重复 ID 会被拒绝，容量满时最早记录被遗忘。它是单进程内存上界保护，不是生产 LRU/TTL、多租户幂等、持久化或跨进程共享。
 - 当前 RAG 运行时路径是 R2.2 SQLite index 合同上的 R2.5 query-time gate。R2.5 仍是 PARTIAL；冻结 holdout 不可重跑、修改或用于调参，也不能将该路径表述为最终质量门已通过。
 - VLM 是单图路径。它不意味着视频、多图批处理或生产多模态服务已完成。
