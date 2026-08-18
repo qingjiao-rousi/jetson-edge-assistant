@@ -72,6 +72,7 @@ def runtime_command(config: dict) -> list[str]:
         "--mmproj-sha256", runtime["mmproj"]["sha256"],
         "--context", str(runtime["context_tokens"]), "--batch", str(runtime["batch_tokens"]),
         "--ubatch", str(runtime["ubatch_tokens"]), "--gpu-layers", str(runtime["gpu_layers"]),
+        "--prefix-reuse", runtime["prefix_reuse"],
     ]
 
 

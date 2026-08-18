@@ -39,6 +39,7 @@ EMC MinFreq=3199000000 MaxFreq=3199000000 CurrentFreq=3199000000 FreqOverride=1
     def test_request_is_deterministic_and_bound_to_configured_model(self):
         config = {"runtime": {"model": {"sha256": "a" * 64}}}
         request = MODULE.runtime_request(config, "request-1", "prompt", 32)
+        self.assertEqual(request["session_id"], "benchmark-prefix-session")
         self.assertEqual(request["model_sha256"], "a" * 64)
         self.assertEqual(request["sampling"], {
             "seed": 424242, "top_k": 1, "top_p": 1.0, "min_p": 0.0, "temperature": 0.0,
@@ -74,6 +75,7 @@ EMC MinFreq=3199000000 MaxFreq=3199000000 CurrentFreq=3199000000 FreqOverride=1
             "model": {"path": "model.gguf", "sha256": "a" * 64},
             "mmproj": {"path": "mmproj.gguf", "sha256": "b" * 64},
             "chat_endpoint": "/v1/chat",
+            "batch_tokens": 512, "ubatch_tokens": 512,
         }}
         image = ("tests/fixture.png", b"png", "image/png", "c" * 64)
         lines = MODULE.environment_lines(
@@ -83,6 +85,7 @@ EMC MinFreq=3199000000 MaxFreq=3199000000 CurrentFreq=3199000000 FreqOverride=1
         self.assertIn("workload=single_image", lines)
         self.assertIn("endpoint=/v1/diagnose/image", lines)
         self.assertIn("max_new_tokens=128", lines)
+        self.assertIn("batch_tokens=512", lines)
 
     def test_dry_run_needs_no_config_or_model(self):
         result = subprocess.run(
@@ -95,6 +98,18 @@ EMC MinFreq=3199000000 MaxFreq=3199000000 CurrentFreq=3199000000 FreqOverride=1
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("no Runtime started", result.stdout)
+
+    def test_prompt_file_cannot_be_combined_with_inline_prompt(self):
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "run_jetson_benchmark.py"),
+             "--label", "validation", "--prompt", "inline", "--prompt-file", "tests/fixtures/vlm-context/README.md"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("mutually exclusive", result.stderr)
 
 
 if __name__ == "__main__":

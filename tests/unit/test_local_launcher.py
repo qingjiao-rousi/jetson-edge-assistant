@@ -14,7 +14,7 @@ def config():
         "host": "127.0.0.1", "port": 18086, "base_url": "http://127.0.0.1:18086", "executable": "runtime-host",
         "model": {"path": "model.gguf", "size_bytes": 1, "sha256": "a" * 64},
         "mmproj": {"path": "mmproj.gguf", "size_bytes": 1, "sha256": "b" * 64},
-        "context_tokens": 8192, "batch_tokens": 512, "ubatch_tokens": 512, "gpu_layers": 99,
+        "context_tokens": 8192, "batch_tokens": 512, "ubatch_tokens": 512, "gpu_layers": 99, "prefix_reuse": "disabled",
     }}
 
 

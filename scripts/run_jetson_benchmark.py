@@ -116,6 +116,10 @@ def runtime_request(config: dict[str, Any], request_id: str, prompt: str, max_ne
     runtime = config["runtime"]
     return {
         "request_id": request_id,
+        # A single deterministic session lets the OPT-1 experiment exercise
+        # the Runtime's one-hot text KV policy. Image workloads intentionally
+        # use the separate diagnosis contract and do not carry this key.
+        "session_id": "benchmark-prefix-session",
         "messages": [{"role": "user", "content": prompt}],
         "max_new_tokens": max_new_tokens,
         "timeout_ms": 120000,
@@ -186,6 +190,8 @@ def environment_lines(config: dict[str, Any], label: str, prompt: str, repeats: 
         f"endpoint={DIAGNOSIS_ENDPOINT if image is not None else runtime['chat_endpoint']}",
         f"max_new_tokens={max_new_tokens}",
         f"repeats={repeats}",
+        f"batch_tokens={runtime['batch_tokens']}",
+        f"ubatch_tokens={runtime['ubatch_tokens']}",
         f"clocks_locked={str(clocks_locked).lower()}",
         f"clock_status={clock_detail}",
         f"platform={platform.platform()}",
@@ -213,6 +219,7 @@ def main() -> int:
     parser.add_argument("--repeats", type=int, default=15)
     parser.add_argument("--max-new-tokens", type=int, default=128)
     parser.add_argument("--prompt")
+    parser.add_argument("--prompt-file", help="UTF-8 text prompt file; binds long synthetic inputs without shell interpolation")
     parser.add_argument("--image", help="repository-relative PNG, JPEG, or WebP fixture for a single-image run")
     parser.add_argument("--tegrastats", help="optional tegrastats executable path")
     parser.add_argument("--ready-timeout", type=float, default=180.0)
@@ -234,7 +241,20 @@ def main() -> int:
         parser.error(str(error))
     if image is not None and args.max_new_tokens != 128:
         parser.error("the /v1/diagnose/image contract fixes max-new-tokens at 128")
-    prompt = args.prompt or (DEFAULT_IMAGE_PROMPT if image is not None else DEFAULT_PROMPT)
+    if args.prompt and args.prompt_file:
+        parser.error("--prompt and --prompt-file are mutually exclusive")
+    prompt_file = pathlib.Path(args.prompt_file).resolve() if args.prompt_file else None
+    if prompt_file is not None:
+        if not prompt_file.is_file():
+            parser.error("--prompt-file must be an existing file")
+        try:
+            prompt = prompt_file.read_text(encoding="utf-8")
+        except OSError as error:
+            parser.error(f"could not read --prompt-file: {error}")
+        if not prompt:
+            parser.error("--prompt-file must not be empty")
+    else:
+        prompt = args.prompt or (DEFAULT_IMAGE_PROMPT if image is not None else DEFAULT_PROMPT)
 
     git_commit, worktree_clean, git_status_entries, git_status_sha256 = git_source_state()
     if not worktree_clean and not args.allow_dirty_worktree:
@@ -272,6 +292,10 @@ def main() -> int:
         + "\njetson_clocks_show_begin\n" + clock_output + "jetson_clocks_show_end\n",
         encoding="utf-8",
     )
+    if prompt_file is not None:
+        with environment_path.open("a", encoding="utf-8") as environment:
+            environment.write(f"prompt_file={prompt_file}\n")
+            environment.write(f"prompt_bytes={len(prompt.encode('utf-8'))}\n")
 
     runtime_process: subprocess.Popen[bytes] | None = None
     tegrastats_process: subprocess.Popen[bytes] | None = None

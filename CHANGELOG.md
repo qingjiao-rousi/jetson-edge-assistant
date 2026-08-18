@@ -17,6 +17,8 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Clean-commit paired Q4/Q8 fixed-image end-to-end latency/resource comparison.
 - Clean-commit paired Q4/Q8 fixed-image structured stage-timing comparison.
 - Apache-2.0 project license and third-party/model asset notices.
+- Jetson-reviewed real `MtmdBackend` Prefix Reuse correctness matrix for exact/branch and session/image/timeout/cancel/reset invalidation.
+- Jetson-reviewed OPT-1 calibrated Runtime-length matrix and paired 30-minute serial soak, with raw SHA-256 bindings and explicit batch-boundary/resource-observation limits.
 
 ### Changed
 
@@ -26,6 +28,7 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Runtime port preflight checks for a live listener without binding a probe socket, allowing safe back-to-back benchmark runs after normal shutdown.
 - Runtime image metrics track measurement availability separately from integer millisecond values and split preprocessing, vision encoding and image-embedding injection around stable upstream mtmd APIs.
 - Documented `d11617e` as the public portfolio baseline and separated existing DirectBackend Prefix Reuse from the planned Qwen2.5-VL MtmdBackend optimization path.
+- OPT-1 is `VALIDATED` on `experiment/mtmd-prefix`; it is not integrated into `main`.
 
 ### Known limitations
 

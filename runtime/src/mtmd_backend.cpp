@@ -10,6 +10,7 @@
 
 #include "edgeomni/vlm_asset_verifier.h"
 #include "edgeomni/vlm_input_validator.h"
+#include "edgeomni/prefix_reuse_policy.h"
 #include "llama_backend_lifecycle.h"
 #include "llama.h"
 #include "mtmd-helper.h"
@@ -57,6 +58,8 @@ class MtmdBackend::Impl {
     std::atomic_bool cancelled{false};
     std::atomic<std::atomic_bool *> external_cancel{nullptr};
     std::atomic<int64_t> deadline_ns{0};
+    std::string hot_session_id;
+    std::vector<llama_token> hot_prompt_tokens;
 };
 
 MtmdBackend::MtmdBackend() : impl_(std::make_unique<Impl>()) {}
@@ -119,7 +122,20 @@ GenerateResponse MtmdBackend::generate_text(const GenerateRequest & request, con
         response.code = RuntimeErrorCode::kInvalidArgument; response.finish_reason = "error"; response.error_message = "request requires request_id, messages, and max_new_tokens"; return response;
     }
     if (request.images.size() > 1U) { response.code = RuntimeErrorCode::kImageCountExceeded; response.finish_reason = "error"; response.error_message = "at most one image is supported"; return response; }
-    struct Guard { Impl & impl; ~Guard() { llama_synchronize(impl.context.get()); llama_memory_clear(llama_get_memory(impl.context.get()), false); std::lock_guard<std::mutex> l(impl.control_mutex); impl.active_request_id.clear(); impl.cancelled.store(false); impl.external_cancel.store(nullptr); impl.deadline_ns.store(0); } } guard{*impl_};
+    struct Guard {
+        Impl & impl;
+        bool preserve_prompt = false;
+        ~Guard() {
+            llama_synchronize(impl.context.get());
+            if (!preserve_prompt) {
+                llama_memory_clear(llama_get_memory(impl.context.get()), false);
+                impl.hot_session_id.clear();
+                impl.hot_prompt_tokens.clear();
+            }
+            std::lock_guard<std::mutex> l(impl.control_mutex);
+            impl.active_request_id.clear(); impl.cancelled.store(false); impl.external_cancel.store(nullptr); impl.deadline_ns.store(0);
+        }
+    } guard{*impl_};
     {
         std::lock_guard<std::mutex> lock(impl_->control_mutex);
         impl_->active_request_id = request.request_id; impl_->cancelled.store(false); impl_->external_cancel.store(request.cancel_flag.get());
@@ -166,12 +182,84 @@ GenerateResponse MtmdBackend::generate_text(const GenerateRequest & request, con
     const int tokenize = mtmd_tokenize(impl_->vision.get(), chunks.get(), &input, bitmap_ptr ? bitmaps : nullptr, bitmap_ptr ? 1 : 0);
     if (tokenize != 0) { response.code = tokenize == 2 ? RuntimeErrorCode::kImageDecodeFailed : RuntimeErrorCode::kTokenizeFailed; response.finish_reason = "error"; response.error_message = "mtmd prompt chunk tokenization failed"; return response; }
     const size_t prompt_tokens = mtmd_helper_get_n_tokens(chunks.get());
+    const bool text_only = request.images.empty();
+    std::vector<llama_token> prompt_token_ids;
+    if (text_only) {
+        prompt_token_ids.reserve(prompt_tokens);
+        for (size_t index = 0; index < mtmd_input_chunks_size(chunks.get()); ++index) {
+            const auto * chunk = mtmd_input_chunks_get(chunks.get(), index);
+            if (mtmd_input_chunk_get_type(chunk) != MTMD_INPUT_CHUNK_TYPE_TEXT) {
+                response.code = RuntimeErrorCode::kInternal; response.finish_reason = "error";
+                response.error_message = "text-only request produced a non-text mtmd chunk"; return response;
+            }
+            size_t count = 0;
+            const llama_token * values = mtmd_input_chunk_get_tokens_text(chunk, &count);
+            if (!values || count != mtmd_input_chunk_get_n_tokens(chunk)) {
+                response.code = RuntimeErrorCode::kTokenizeFailed; response.finish_reason = "error";
+                response.error_message = "mtmd text chunk did not expose token ids"; return response;
+            }
+            prompt_token_ids.insert(prompt_token_ids.end(), values, values + count);
+        }
+        if (prompt_token_ids.size() != prompt_tokens) {
+            response.code = RuntimeErrorCode::kTokenizeFailed; response.finish_reason = "error";
+            response.error_message = "mtmd text token count disagrees with chunk total"; return response;
+        }
+    }
     for (size_t i = 0; i < mtmd_input_chunks_size(chunks.get()); ++i) { const auto * chunk = mtmd_input_chunks_get(chunks.get(), i); if (mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_IMAGE) response.image_tokens += static_cast<uint32_t>(mtmd_image_tokens_get_n_tokens(mtmd_input_chunk_get_tokens_image(chunk))); }
     if (prompt_tokens + request.max_new_tokens > llama_n_ctx(impl_->context.get())) { response.code = RuntimeErrorCode::kContextLimit; response.finish_reason = "error"; response.error_message = "prompt plus requested generation exceeds context"; return response; }
     const auto prefill_started = std::chrono::steady_clock::now(); llama_pos n_past = 0;
     int eval = 0;
     const size_t chunk_count = mtmd_input_chunks_size(chunks.get());
-    for (size_t index = 0; index < chunk_count && eval == 0; ++index) {
+    size_t reused = 0;
+    const auto clear_hot = [&](const char * reason) {
+        llama_synchronize(impl_->context.get());
+        llama_memory_clear(llama_get_memory(impl_->context.get()), false);
+        impl_->hot_session_id.clear(); impl_->hot_prompt_tokens.clear();
+        response.metrics.cache_invalidation_reason = reason;
+    };
+    const auto remove_kv_range = [&](size_t begin) {
+        llama_synchronize(impl_->context.get());
+        const bool removed = llama_memory_seq_rm(llama_get_memory(impl_->context.get()), 0, static_cast<llama_pos>(begin), -1);
+        llama_synchronize(impl_->context.get());
+        return removed;
+    };
+    const bool reuse_enabled = impl_->config.prefix_reuse_mode == PrefixReuseMode::kSingleHotText;
+    if (!text_only) {
+        clear_hot("image_request");
+    } else if (!reuse_enabled) {
+        clear_hot("disabled");
+    } else if (request.session_id.empty()) {
+        clear_hot("no_session_id");
+    } else if (!impl_->hot_session_id.empty() && impl_->hot_session_id != request.session_id) {
+        clear_hot("session_id_changed");
+    } else if (!impl_->hot_prompt_tokens.empty()) {
+        size_t lcp = 0;
+        while (lcp < impl_->hot_prompt_tokens.size() && lcp < prompt_token_ids.size() && impl_->hot_prompt_tokens[lcp] == prompt_token_ids[lcp]) ++lcp;
+        reused = reusable_prefix_tokens(lcp, prompt_token_ids.size(), impl_->config.batch_tokens);
+        if (!remove_kv_range(reused)) { clear_hot("kv_rollback_failed"); reused = 0; }
+    } else {
+        llama_memory_clear(llama_get_memory(impl_->context.get()), false);
+    }
+    response.metrics.cache_hit_tokens = static_cast<uint32_t>(reused);
+    response.metrics.cache_miss_tokens = static_cast<uint32_t>(prompt_tokens - reused);
+    response.metrics.prefill_input_tokens = response.metrics.cache_miss_tokens;
+    response.metrics.cache_hit_ratio = prompt_tokens == 0U ? 0.0 : static_cast<double>(reused) / prompt_tokens;
+    response.metrics.cache_reused = reused > 0U;
+    if (text_only) {
+        BatchOwner batch(static_cast<int>(std::min<uint32_t>(impl_->config.batch_tokens, impl_->config.context_tokens)));
+        for (size_t begin = reused; begin < prompt_token_ids.size() && eval == 0;) {
+            const int count = static_cast<int>(std::min<size_t>(impl_->config.batch_tokens, prompt_token_ids.size() - begin));
+            batch.value.n_tokens = count;
+            for (int i = 0; i < count; ++i) {
+                batch.value.token[i] = prompt_token_ids[begin + static_cast<size_t>(i)];
+                batch.value.pos[i] = static_cast<llama_pos>(begin + static_cast<size_t>(i));
+                batch.value.n_seq_id[i] = 1; batch.value.seq_id[i][0] = 0;
+                batch.value.logits[i] = begin + static_cast<size_t>(i) + 1U == prompt_token_ids.size();
+            }
+            eval = llama_decode(impl_->context.get(), batch.value);
+            begin += static_cast<size_t>(count);
+        }
+    } else for (size_t index = 0; index < chunk_count && eval == 0; ++index) {
         const mtmd_input_chunk * chunk = mtmd_input_chunks_get(chunks.get(), index);
         const bool logits_last = index + 1U == chunk_count;
         if (mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_IMAGE) {
@@ -194,7 +282,7 @@ GenerateResponse MtmdBackend::generate_text(const GenerateRequest & request, con
         }
     }
     response.metrics.prefill_ms = elapsed_ms(prefill_started);
-    if (eval != 0) { if (stop()) { response.metrics.total_ms = elapsed_ms(started); return response; } response.code = RuntimeErrorCode::kVisionEncodeFailed; response.finish_reason = "error"; response.error_message = "mtmd vision encode or prompt evaluation failed"; response.metrics.total_ms = elapsed_ms(started); return response; }
+    if (eval != 0) { clear_hot("prefill_failed"); if (stop()) { response.metrics.total_ms = elapsed_ms(started); return response; } response.code = RuntimeErrorCode::kVisionEncodeFailed; response.finish_reason = "error"; response.error_message = "mtmd vision encode or prompt evaluation failed"; response.metrics.total_ms = elapsed_ms(started); return response; }
     response.prompt_tokens = static_cast<uint32_t>(prompt_tokens); response.metrics.prompt_tokens = response.prompt_tokens;
     if (stop()) { response.metrics.total_ms = elapsed_ms(started); return response; }
     llama_sampler_chain_params sampler_params = llama_sampler_chain_default_params();
@@ -210,17 +298,25 @@ GenerateResponse MtmdBackend::generate_text(const GenerateRequest & request, con
         if (!converted.ok()) { response.code = converted.code; response.error_message = converted.message; response.finish_reason = "error"; break; }
         if (on_token && !on_token({request.request_id, piece, response.generated_tokens})) { impl_->cancelled.store(true); stop(); break; }
         response.text += piece; ++response.generated_tokens; if (response.generated_tokens == 1U) { response.metrics.first_token_ms = elapsed_ms(started); response.metrics.ttft_ms = response.metrics.first_token_ms; }
-        auto & next = batch.value; next.n_tokens = 1; next.token[0] = token; next.pos[0] = n_past++; next.n_seq_id[0] = 1; next.seq_id[0][0] = 0; next.logits[0] = 1;
+        auto & next = batch.value; next.n_tokens = 1; next.token[0] = token;
+        next.pos[0] = text_only ? static_cast<llama_pos>(prompt_tokens + i) : n_past++;
+        next.n_seq_id[0] = 1; next.seq_id[0][0] = 0; next.logits[0] = 1;
         if (llama_decode(impl_->context.get(), next) != 0) { if (!stop()) { response.code = RuntimeErrorCode::kDecodeFailed; response.finish_reason = "error"; response.error_message = "llama decode failed during generation"; } break; }
     }
     response.metrics.output_tokens = response.generated_tokens; response.metrics.decode_ms = elapsed_ms(decode_started); response.metrics.total_ms = elapsed_ms(started);
     if (response.generated_tokens > 1U && response.metrics.decode_ms > 0U) response.metrics.tpot_ms = response.metrics.decode_ms / response.generated_tokens;
     if (response.metrics.decode_ms > 0U) response.metrics.decode_tokens_per_second = static_cast<double>(response.generated_tokens) * 1000.0 / response.metrics.decode_ms;
     if (response.finish_reason.empty()) response.finish_reason = "length";
+    if (response.code == RuntimeErrorCode::kOk && text_only && reuse_enabled && !request.session_id.empty()) {
+        if (!remove_kv_range(prompt_tokens)) clear_hot("kv_rollback_failed");
+        else { impl_->hot_session_id = request.session_id; impl_->hot_prompt_tokens = prompt_token_ids; guard.preserve_prompt = true; }
+    } else if (response.code != RuntimeErrorCode::kOk || !text_only) {
+        clear_hot(response.code == RuntimeErrorCode::kOk ? "image_request" : "incomplete_request");
+    }
     return response;
 }
 
 Status MtmdBackend::cancel_request(const std::string & request_id) { std::lock_guard<std::mutex> lock(impl_->control_mutex); if (!impl_->initialized || request_id.empty() || impl_->active_request_id != request_id) return {RuntimeErrorCode::kInvalidState, "no matching active request"}; impl_->cancelled.store(true); return Status::Ok(); }
-Status MtmdBackend::reset_context() { std::lock_guard<std::mutex> lock(impl_->generation_mutex); if (!impl_->initialized) return {RuntimeErrorCode::kInvalidState, "MtmdBackend is not initialized"}; llama_memory_clear(llama_get_memory(impl_->context.get()), false); return Status::Ok(); }
-Status MtmdBackend::shutdown() { std::lock_guard<std::mutex> generation(impl_->generation_mutex); std::lock_guard<std::mutex> lifecycle(impl_->lifecycle_mutex); impl_->vision.reset(); impl_->context.reset(); impl_->model.reset(); impl_->vocab = nullptr; impl_->initialized = false; if (impl_->backend_acquired) { release_llama_backend(); impl_->backend_acquired = false; } return Status::Ok(); }
+Status MtmdBackend::reset_context() { std::lock_guard<std::mutex> lock(impl_->generation_mutex); if (!impl_->initialized) return {RuntimeErrorCode::kInvalidState, "MtmdBackend is not initialized"}; llama_memory_clear(llama_get_memory(impl_->context.get()), false); impl_->hot_session_id.clear(); impl_->hot_prompt_tokens.clear(); return Status::Ok(); }
+Status MtmdBackend::shutdown() { std::lock_guard<std::mutex> generation(impl_->generation_mutex); std::lock_guard<std::mutex> lifecycle(impl_->lifecycle_mutex); impl_->vision.reset(); impl_->context.reset(); impl_->model.reset(); impl_->vocab = nullptr; impl_->hot_session_id.clear(); impl_->hot_prompt_tokens.clear(); impl_->initialized = false; if (impl_->backend_acquired) { release_llama_backend(); impl_->backend_acquired = false; } return Status::Ok(); }
 }  // namespace edgeomni

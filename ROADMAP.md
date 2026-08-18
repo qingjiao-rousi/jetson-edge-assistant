@@ -16,9 +16,9 @@ Roadmap items are planned work, not implemented capability or delivery commitmen
 
 ## P1: focused inference optimization
 
-- [ ] OPT-1: implement text-only single-hot Prefix Reuse in the real Qwen2.5-VL `MtmdBackend` path
-- [ ] Pass exact/branch/session/image/cancel/timeout/reset KV correctness gates
-- [ ] Benchmark cold versus hot Prefill/TTFT at 256/512/1024/2048 prompt tokens (**Jetson required**)
+- [x] OPT-1: `VALIDATED` on `experiment/mtmd-prefix` for text-only single-hot Prefix Reuse in the real Qwen2.5-VL `MtmdBackend` path; not integrated into `main`
+- [x] Pass exact/branch/session/image/cancel/timeout/reset KV correctness gates
+- [x] Validate cold versus hot Prefill/TTFT across calibrated Runtime prompt lengths, including the 512-token batch-boundary limitation
 - [ ] Measure real RAG prompt LCP distribution before integrating Agent-to-Runtime session mapping
 - [ ] OPT-2: profile steady decode with Nsight before selecting any token/s change (**Jetson required**)
 - [ ] OPT-3: freeze a small licensed VLM quality set before testing resolution/token-budget trade-offs
@@ -28,7 +28,7 @@ Roadmap items are planned work, not implemented capability or delivery commitmen
 
 - [ ] Run Runtime HTTP contract test where loopback binding is allowed and require no skip
 - [ ] Add a minimal systemd unit and shutdown/log rotation runbook (**Jetson required**)
-- [ ] Run 30-60 minute serial soak with RSS/GPU memory, temperature and error accounting (**Jetson required**)
+- [x] Run paired 30-minute serial soak with Runtime output/cache/error and Jetson resource observations
 - [x] Publish fixed single-image latency/resource and structured stage measurements without claiming accuracy
 - [ ] Define a new RAG evaluation before changing the frozen default; R2.5 remains PARTIAL
 - [ ] Make Runtime backend/model profiles data-driven and publish validated Q4/Q8 example contracts (**Jetson and assets required**)
@@ -40,6 +40,6 @@ Docker is optional P1/P2 rather than a portfolio P0: offline Jetson deployment a
 - [ ] Authentication, authorization, audit policy and threat model
 - [ ] Multi-session scheduling/cache design with explicit concurrency and memory targets
 - [ ] Persistent session/idempotency semantics and restart recovery
-- [ ] Longer soak, fault injection and production observability
+- [ ] Run a 120-minute soak, fault injection and production observability validation
 - [ ] Multi-image/video only after a new API, memory budget and validation plan
 - [ ] AEC, interruption and full-duplex audio only after real microphone/device testing

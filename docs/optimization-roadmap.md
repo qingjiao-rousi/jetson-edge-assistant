@@ -1,8 +1,8 @@
 # EdgeOmni 深入优化路线与实时状态
 
-最后更新：2026-08-13  
-公开作品集基线：`d11617e` (`docs(benchmark): publish paired VLM stage timings`)  
-当前阶段：**基线已冻结，深入优化尚未开始**
+最后更新：2026-08-17
+公开作品集基线：`d11617e` (`docs(benchmark): publish paired VLM stage timings`)
+当前阶段：**OPT-1 已在实验分支 VALIDATED；未合入 main**
 
 本文是基线之后性能优化工作的唯一状态源。`README.md` 只展示摘要，`ROADMAP.md` 只保留里程碑。每次实验更新本页的状态、证据和决策记录，不用未审核结果覆盖既有 reviewed baseline。
 
@@ -27,8 +27,8 @@
 | 核心离线原型 | **完成（按声明范围）** | 文本/单图 Runtime、RAG/Agent、离线合同、Jetson load/ready/请求 | 不包含视频、多图、批处理和高并发 |
 | Jetson 短时性能证据 | **完成** | Q4/Q8 文本、固定单图 E2E/阶段计时和资源遥测 | 不代表长稳、墙插功耗、质量或生产尾延迟 |
 | RAG/VLM 质量 | **部分完成** | 引用/拒答合同；RAG R2.5 明确为 PARTIAL | 新独立 RAG eval、真实 VLM 小型质量集 |
-| 部署运维 | **部分完成** | 原生离线构建/启动/校验流程 | clean-clone 演练、无 skip HTTP CTest、systemd、日志轮转、soak |
-| 深入性能优化 | **尚未开始** | 已有可比较基线和结构化指标 | 下述 OPT-1 至 OPT-4 |
+| 部署运维 | **部分完成** | 原生离线构建/启动/校验流程、OPT-1 30 分钟 serial soak | clean-clone 演练、无 skip HTTP CTest、systemd、日志轮转、120 分钟/故障注入 |
+| 深入性能优化 | **OPT-1 VALIDATED（实验分支）** | 709-token correctness、四档 Runtime-length matrix、paired 30 分钟 soak | Q8 对照、RAG LCP 分布、Agent/RAG 映射 |
 | 生产化 | **未实现且非当前目标** | 无 | 鉴权、审计、多用户调度、故障注入、生产 SLA |
 
 不使用一个笼统百分比描述整个项目，因为“作品集完整度”和“生产完整度”不是同一分母。当前可以准确表述为：**作品集 P0 和声明范围内的核心原型已完成；质量、长稳和生产化仍未完成。**
@@ -49,7 +49,7 @@
 
 | ID | 优化线 | 当前状态 | 主指标 | 招聘价值 | 进入条件 |
 | --- | --- | --- | --- | --- | --- |
-| OPT-1 | 真实 `MtmdBackend` Prefix Reuse | **PLANNED** | Prefill、TTFT、hit tokens | 最高：Runtime 状态管理与正确性 | 先执行 |
+| OPT-1 | 真实 `MtmdBackend` Prefix Reuse | **VALIDATED** | Prefill、TTFT、hit tokens | 最高：Runtime 状态管理与正确性 | main 合入前复核；120 分钟/故障注入与整合后续独立进行 |
 | OPT-2 | Nsight 驱动 decode 优化 | **PLANNED** | token/s、TPOT、GPU timeline | 高，但最终提速不确定 | OPT-1 数据稳定后 |
 | OPT-3 | 多分辨率 VLM 权衡 | **PLANNED** | image tokens、vision latency、质量 | 中高：端侧视觉资源策略 | 先冻结质量集 |
 | OPT-4 | RAG/HTTP/图片解码小开销 | **MEASURE FIRST** | 分阶段延迟、占比 | 中；只优化已证明瓶颈 | profiling 显示值得做 |
@@ -65,6 +65,30 @@
 第一阶段不整合 Agent/RAG session，不实现多 session、LRU/TTL、跨进程持久化或图像 KV reuse。先通过专用 Runtime workload 证明机制和收益；通过整合门后再设计 Agent session 到 Runtime session 的映射。
 
 ### 设计
+
+当前实现已落在 `runtime/src/mtmd_backend.cpp`，由 `RuntimeConfig.prefix_reuse_mode` 控制；默认值和现有公开配置均为 `disabled`。`single_hot_text` 只通过显式配置启用。709-token Q4 exact prompt 已有 reviewed Prefill/TTFT 收益；该收益不外推到其他输入或会话模型。
+
+本地检查入口：
+
+```bash
+cmake -S . -B build-runtime -DEDGEOMNI_BUILD_TESTS=ON -DEDGEOMNI_BUILD_INTEGRATION=OFF
+cmake --build build-runtime -j"$(nproc)"
+ctest --test-dir build-runtime --output-on-failure
+python3 -m unittest discover -s tests/unit -p 'test_*.py'
+```
+
+Jetson 实测入口（需模型、MMProj 和已构建 Runtime）：
+
+```bash
+scripts/run_jetson_benchmark.sh --config configs/assistant.json \
+  --label opt1-q4-disabled --repeats 30 --max-new-tokens 128
+scripts/run_jetson_benchmark.sh --config configs/assistant-prefix-single-hot.json \
+  --label opt1-q4-single-hot --repeats 30 --max-new-tokens 128
+```
+
+文本 benchmark 使用固定的 `benchmark-prefix-session` 发送连续请求，才能测到同一 hot session 的 LCP；单图 benchmark 仍使用独立诊断请求，不复用视觉 KV。
+
+上述命令只产生 raw evidence；在复制 protocol 字段、检查 cold/hot 输出一致性和缓存失效场景前，结果必须保持 `UNREVIEWED`。709-token exact-prompt 的 correctness 和 Prefill/TTFT，以及 branch、session/image/timeout/cancel/reset 失效恢复，均已完成 reviewed Jetson 实测；RAM 长稳和更广泛 workload 仍为**待实测**。
 
 实验配置应提供 `disabled` 与 `single_hot_text` 两种模式，使 A/B 使用同一代码和二进制，仅改变显式配置。
 
@@ -91,8 +115,8 @@ cancel/timeout/prefill/decode/rollback failure
 
 1. 从 text-only `mtmd_input_chunks` 取得并拼接 `llama_token`。
 2. 保存一个 hot session 的 `session_id`、prompt tokens、模型/模板/Runtime 配置 fingerprint。
-3. 计算新旧 token LCP；完全相同 prompt 回退一个 token，重新得到本次请求 logits。
-4. 使用上游 `llama_memory_seq_rm()` 删除 `[LCP, end)`，从 LCP 开始构造 text batch。
+3. 计算新旧 token LCP，并向下对齐到完整 cold-prefill batch；exact prompt 也重新计算最后一个完整或尾部 cold batch，保持产生 logits 的 batch 形状。
+4. 使用上游 `llama_memory_seq_rm()` 删除 `[aligned LCP, end)`，从对齐后的 LCP 开始构造 text batch。
 5. 成功生成后删除 `[prompt_tokens, end)`，保留完整 prompt KV。
 6. 将所有异常路径汇入统一 `clear_hot(reason)`；同步 llama context 后再修改 memory。
 7. 图片请求无条件标记 `image_request` 并清空；第一阶段不复用图像 embedding。
@@ -108,6 +132,30 @@ cancel/timeout/prefill/decode/rollback failure
 - disabled 模式维持 `d11617e` cold 行为，不产生隐式缓存。
 
 任何一项未通过时不得进入正式性能报告。
+
+真实 Runtime 的失效矩阵由 `scripts/validate_mtmd_prefix_reuse.py` 执行。它在独立 disabled/hot Runtime 进程间比较 cold/exact/branch 输出，并在 hot Runtime 内验证 session switch、单图请求、timeout、HTTP cancel 和 `POST /v1/context/reset` 后下一文本请求为 cold。该 reset 路由只允许服务空闲时调用；它是实验和运维诊断接口，不是多用户会话 API。
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+source = Path('/tmp/edgeomni-opt1/p256.txt').read_text(encoding='utf-8')
+Path('/tmp/edgeomni-opt1/t709-branch.txt').write_text(
+    source + ' Branch-specific final instruction: state only the observed alarm.', encoding='utf-8')
+PY
+
+sudo jetson_clocks
+sudo -v
+python3 scripts/validate_mtmd_prefix_reuse.py \
+  --prompt-file /tmp/edgeomni-opt1/p256.txt \
+  --branch-prompt-file /tmp/edgeomni-opt1/t709-branch.txt \
+  --output benchmarks/results/opt1-t709-correctness.json
+```
+
+`PASS` 只说明这一次 Runtime correctness matrix 通过。输出 JSON 是 local raw evidence，仍需绑定 clean commit、模型 hash 和运行日志后才能支持对外声明。
+
+长度矩阵与长稳验证（已在实验分支 `VALIDATED`）：`generate_opt1_prompts.py` 的 256/512/1024/2048 仅是 tokenizer 级 `user_prompt_tokens`，不能称为 HTTP Runtime 长度。disabled 校准得到实际 `runtime-p264`、`runtime-p520`、`runtime-p1032`、`runtime-p2056`；每档 1 warm-up（不计入）+ 30 measured。batch/ubatch=512 是收益下限：264-token 的零 hit 为 `PASS_EXPECTED_NO_REUSE`，只验证 cold-path 正确性，不声称优化收益；520/1032/2056 为 `PASS_REUSE`。paired 30-minute `runtime-p1032` soak 通过输出 hash、cache/error、stable-clock 和 duration gates；其资源趋势仅为观测，不能证明或否定 KV leak。见 `benchmarks/opt1-q4-length-matrix-20260814.md` 和 `benchmarks/opt1-q4-soak-20260817.md`。120 分钟 soak、故障注入、RAG LCP 分布和 Agent/RAG 映射仍待完成。
+
+Soak 使用 `run_opt1_soak.py --minutes 30`（可选 120）分别运行 disabled 和 single-hot；Runtime ready 与 warm-up HTTP 200 后才开始计时。默认拒绝 dirty worktree、动态时钟和端口复用；显式允许时只能标记 `EXPLORATORY_UNREVIEWED`。raw 记录 commit、资产/config/prompt hash、可比 Runtime 参数、clocks、UTC 时间、请求时长、warm-up、失败原因和完整日志；异常仍保留已收集 raw。单侧 soak 审核要求输出 hash 唯一、disabled 零 hit、single-hot 默认 100% 正 hit 和完整 accounting。正式 paired 结论必须再经 `audit_opt1_soak_pair.py`：两侧都必须是 formal raw、provenance/Runtime 参数/clock 一致、duration 充分、response shape 和唯一 output hash 跨模式一致。它还报告 tegrastats 前/后 20% RAM 中位数与峰值作为短时资源趋势；统一 RAM、温度和该趋势都只是资源观测，不能单独证明或否定 KV leak。
 
 ### 性能协议
 
@@ -175,7 +223,13 @@ experiment/vlm-token-budget  # OPT-3
 | 日期 | 决策 | 状态/证据 |
 | --- | --- | --- |
 | 2026-08-13 | 冻结 `d11617e` 为公开作品集基线；不把它称为生产版本 | 已有 reviewed 文本/单图报告，main clean |
-| 2026-08-13 | 第一深入方向选择真实 `MtmdBackend` text-only Prefix Reuse | PLANNED；尚无实现或性能数字 |
+| 2026-08-13 | 第一深入方向选择真实 `MtmdBackend` text-only Prefix Reuse | 已实现；exact-prompt 已实测，完整正确性矩阵待完成 |
+| 2026-08-13 | 在实验分支实现显式 `disabled/single_hot_text` 配置、mtmd 文本 token LCP、KV 回滚和失效策略 | 本地 CMake/CTest 与 709-token exact-prompt Jetson 配对通过 |
+| 2026-08-13 | Q4 短 prompt 首轮 disabled/single-hot 配对 | 后续长 prompt 正确性失败，报告已 RETRACTED，不作为性能证据 |
+| 2026-08-13 | 709-token exact prompt 暴露 one-token rollback 数值偏差 | disabled 输出 22 tokens，hot 输出 11 tokens；暂停扩大 benchmark |
+| 2026-08-13 | Prefix reuse 改为只保留完整 cold-prefill batch，并重算最后一个 cold batch | 709-token prompt 实测命中 512、重算 197；跨模式输出一致 |
+| 2026-08-13 | batch-boundary 修复完成 709-token clean-commit 配对复验 | 30/30 每组成功且跨模式输出一致；Prefill 中位数 978 -> 84 ms，TTFT 1330 -> 439 ms；见 reviewed OPT-1 报告 |
+| 2026-08-13 | 独立 Runtime correctness matrix 通过 | exact/branch 输出匹配 cold；session、image、timeout、cancel、reset 后文本 KV 均 cold；见 `benchmarks/opt1-t709-correctness-20260813.md` |
 | 2026-08-13 | Agent/RAG session 映射暂不整合，先用专用 Runtime workload 验证 | 避免同时改变 Runtime 与应用生命周期 |
 | 2026-08-13 | Nsight、多分辨率和小开销优化排在 OPT-1 之后 | 避免多变量和错误归因 |
-
+| 2026-08-17 | OPT-1 实验分支收口为 VALIDATED | 四档 Runtime-length matrix 与 paired 30-minute soak 通过；不代表 main INTEGRATED、生产缓存或 SLA |

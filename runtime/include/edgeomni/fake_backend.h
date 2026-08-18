@@ -31,6 +31,8 @@ class FakeBackend final : public RuntimeBackend {
     GenerateRequest last_request_;
     std::string hot_session_id_;
     std::vector<uint8_t> hot_prompt_tokens_;
+    PrefixReuseMode prefix_reuse_mode_ = PrefixReuseMode::kDisabled;
+    uint32_t prefix_reuse_batch_tokens_ = 512;
 };
 
 }  // namespace edgeomni

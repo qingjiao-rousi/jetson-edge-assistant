@@ -65,6 +65,8 @@ int main_test() {
     edgeomni::ServiceConfig config;
     config.runtime.model_path = __FILE__;
     config.runtime.expected_model_sha256 = kHash;
+    config.runtime.prefix_reuse_mode = edgeomni::PrefixReuseMode::kSingleHotText;
+    config.runtime.batch_tokens = 1;
     config.model_name = "fake";
     config.model_sha256 = kHash;
     config.template_fingerprint = "qwen3-test";
@@ -107,6 +109,13 @@ int main_test() {
     auto hot_session_again = request("hot-session-again"); hot_session_again["session_id"] = "s"; auto session_again = client.Post("/v1/chat", hot_session_again.dump(), "application/json");
     expect(session_again && session_again->status == 200 && json::parse(session_again->body)["metrics"]["cache_hit_tokens"] > 0,
            "chat route reports a hot prefix hit");
+    auto reset = client.Post("/v1/context/reset", "", "application/json");
+    expect(reset && reset->status == 200 && json::parse(reset->body).value("reset", false), "idle context reset succeeds");
+    auto after_reset = request("after-reset"); after_reset["session_id"] = "s";
+    auto after_reset_response = client.Post("/v1/chat", after_reset.dump(), "application/json");
+    expect(after_reset_response && after_reset_response->status == 200 &&
+               json::parse(after_reset_response->body)["metrics"]["cache_hit_tokens"] == 0,
+           "context reset clears hot prefix");
 
     auto sse = client.Post("/v1/generate", request("sse", true).dump(), "application/json");
     expect(sse && sse->status == 200 && sse->body.find("event: token") != std::string::npos && sse->body.find("event: done") != std::string::npos, "SSE token and done");
