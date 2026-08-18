@@ -96,13 +96,19 @@ This mode builds the pinned submodule in a new build tree and installs `bin/`, `
 `models/`, and `generated/`. `bin/` ELF files use `$ORIGIN/../lib`; private `lib/` ELF files use
 `$ORIGIN`. It includes `llama-embedding`, `llama-tokenize`, and the EdgeOmni host. The manifest
 records commit IDs, canonical ELF hashes/sizes, symlinks, and RPATH/ldd results. It does not copy
-models, SQLite, or configuration assets automatically. The clean-clone P0 remains open until a
-fresh checkout exercises this mode with the approved offline assets.
+models, SQLite, or configuration assets automatically.
 
-No independent clean-clone plus offline-asset-bundle rehearsal has yet been recorded. Until that
-exercise succeeds, cross-host upstream-build portability, different JetPack compatibility, real
-model loading, CUDA behavior/performance, VLM accuracy, RAG quality, and voice-device operation
-remain unverified.
+The P0 rehearsal completed on 2026-08-18 using EdgeOmni `de19d15` and pinned upstream
+`19cc26967140407efe34006a355ab445b35b16ac` in a new local clone with approved offline assets.
+Fresh CUDA configure/build, 5/5 CTest with no skips, install/manifest, strict relative RPATH,
+`env -u LD_LIBRARY_PATH ldd`, and verification in two absolute bundle paths passed. Minimal
+`/ready`, text, RAG cited-answer/refusal, and fixed-fixture single-image smoke also completed.
+The reviewed scope and limitations are recorded in [Jetson validation](jetson-validation.md).
+
+This rehearsal validates the recorded Jetson environment and exact pinned inputs. It does not
+establish portability to another device or JetPack/L4T release, VLM accuracy, final RAG quality,
+voice-device operation, performance beyond the separately reviewed protocols, or production
+readiness. RAG M9.1B R2.5 remains PARTIAL.
 
 ## Build and Failure Triage
 
@@ -132,4 +138,4 @@ Interpret common failures conservatively:
 | CTest service test is skipped with code 77 | Whether the environment permits binding/reaching a temporary `127.0.0.1` port | HTTP assertions did not run. Repeat on a host that permits loopback; do not report the skip as pass. |
 | RAG SQLite check fails | Delivery-contract metadata, source hashes, read-only open | Supply the matching generated index; do not rebuild or alter the frozen holdout during deployment. |
 
-For a public reproducibility claim, perform these commands from a fresh clone/path with only the approved offline bundle, then record commit IDs, profile output, build output, CTest pass/skip counts, and exact Jetson environment. That rehearsal is currently pending.
+For a new public reproducibility claim, repeat these commands from a fresh clone/path with only the approved offline bundle, then record commit IDs, profile output, build output, CTest pass/skip counts, and exact Jetson environment. The P0 rehearsal for `de19d15` is complete; future code, dependency, asset, or platform changes require a new rehearsal and must not inherit that result.
