@@ -26,7 +26,7 @@ Roadmap items are planned work, not implemented capability or delivery commitmen
 
 ## P1: deployment evidence
 
-- [ ] Run Runtime HTTP contract test where loopback binding is allowed and require no skip
+- [x] Run Runtime HTTP contract test where loopback binding is allowed: 2026-08-18 host-side CTest `edgeomni_service_unit_test` 1/1 Passed, exit 0
 - [ ] Add a minimal systemd unit and shutdown/log rotation runbook (**Jetson required**)
 - [x] Run paired 30-minute serial soak with Runtime output/cache/error and Jetson resource observations
 - [x] Publish fixed single-image latency/resource and structured stage measurements without claiming accuracy

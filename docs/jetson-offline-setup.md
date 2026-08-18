@@ -44,7 +44,7 @@ Apache-2.0. The repository records provenance and hashes, not model bytes or a l
 Run the verifier before building or starting anything:
 
 ```bash
-cd /home/nvidia/Desktop/llm/vlmllm-main
+# Run from the repository root.
 
 python3 scripts/verify_local_assets.py --root . --config configs/assistant.json --profile contract
 python3 scripts/verify_local_assets.py --root . --config configs/assistant.json --profile build-inputs
@@ -84,7 +84,7 @@ remain unverified.
 After `build-inputs` passes, configure and build without downloading or rebuilding upstream:
 
 ```bash
-cd /home/nvidia/Desktop/llm/vlmllm-main
+# Run from the repository root.
 
 cmake -S . -B build-runtime \
   -DEDGEOMNI_BUILD_TESTS=ON \
@@ -94,7 +94,7 @@ cmake --build build-runtime -j"$(nproc)"
 ctest --test-dir build-runtime --output-on-failure
 ```
 
-All paths above are relative to the repository root. If the shell prompt is in `~` (`/home/nvidia`), `scripts/` and `CMakeLists.txt` will not be found. Change directory first or prefix the command with `cd /home/nvidia/Desktop/llm/vlmllm-main &&`.
+All paths above are relative to the repository root. Run the commands from that directory so `scripts/` and `CMakeLists.txt` can be found.
 
 Interpret common failures conservatively:
 

@@ -19,6 +19,8 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Apache-2.0 project license and third-party/model asset notices.
 - Main-integrated real `MtmdBackend` Prefix Reuse, with `c97a518` Jetson dual-path correctness for exact/branch and session/image/timeout/cancel/reset invalidation. Git-ignored raw results are bound by SHA-256 in the optimization roadmap and benchmarks index.
 - Jetson-reviewed OPT-1 calibrated Runtime-length matrix and paired 30-minute serial soak, with raw SHA-256 bindings and explicit batch-boundary/resource-observation limits.
+- Runtime HTTP sampling validation for JSON types, integer bounds, finite floating-point values, and structured HTTP 400 errors.
+- Runtime API documentation for sampling defaults, validation errors, and EdgeOmni HTTP defensive bounds.
 
 ### Changed
 
@@ -29,6 +31,7 @@ This project follows a lightweight Keep a Changelog structure. It has not publis
 - Runtime image metrics track measurement availability separately from integer millisecond values and split preprocessing, vision encoding and image-embedding injection around stable upstream mtmd APIs.
 - Documented `d11617e` as the public portfolio baseline and separated existing DirectBackend Prefix Reuse from the planned Qwen2.5-VL MtmdBackend optimization path.
 - OPT-1 is `INTEGRATED` in `main` as single-hot, text-only, batch-boundary Prefix Reuse over upstream KV APIs; it is not multi-user caching, RAG/Agent session integration, image KV reuse, a production SLA, or a no-leak claim. The 120-minute soak, fault injection, RAG LCP distribution and Agent/RAG mapping remain future work.
+- Sampling validation and its documented bounds are HTTP input guardrails, not a production-service capability claim.
 
 ### Known limitations
 

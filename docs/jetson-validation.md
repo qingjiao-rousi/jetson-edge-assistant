@@ -41,7 +41,7 @@
 
 ## 2026-08-12 当前工作区启动复核
 
-在仓库根目录 `/home/nvidia/Desktop/llm/vlmllm-main` 执行了以下只读/构建检查：
+在仓库根目录执行了以下只读/构建检查：
 
 - `build-inputs` profile 通过：固定 submodule commit 与 `libllama`、`libmtmd`、`libggml`、`libggml-cuda` 的 AArch64 ELF 检查通过。
 - `assistant` profile 通过：Runtime host、Q4 main GGUF、MMProj、embedding GGUF 的大小/SHA-256，以及 RAG SQLite/source binding/read-only 检查通过。

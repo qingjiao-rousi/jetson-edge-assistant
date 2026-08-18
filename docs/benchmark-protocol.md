@@ -42,7 +42,7 @@ sudo -v
 采集示例：
 
 ```bash
-cd /home/nvidia/Desktop/llm/vlmllm-main
+# Run from the repository root.
 scripts/run_jetson_benchmark.sh --dry-run
 
 scripts/run_jetson_benchmark.sh \

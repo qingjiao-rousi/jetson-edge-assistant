@@ -32,7 +32,7 @@ configs/assistant-q8.json
 每份合同都要完整记录 model 和 MMProj 的 path、size、SHA-256，以及相同或有意调整的 context/batch/ubatch/GPU layers。然后分别执行：
 
 ```bash
-cd /home/nvidia/Desktop/llm/vlmllm-main
+# Run from the repository root.
 
 python3 scripts/verify_local_assets.py --root . \
   --config configs/assistant-q4.json --profile assistant

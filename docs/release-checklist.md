@@ -31,6 +31,6 @@ Use this checklist before a tag, portfolio submission, or public repository snap
 - [ ] Docker/systemd/auth/concurrency/soak items are described as roadmap work, not delivered features.
 - [ ] `CHANGELOG.md`, Roadmap and third-party notices reflect the tag.
 
-## Current working-tree audit (2026-08-12)
+## Current release-hygiene status (2026-08-18)
 
-At review time, the worktree contained modified Runtime/Agent/request-id changes plus untracked active-pipeline and R2.6 candidate/evaluation files. These changes may be valid, but they are not a clean public release boundary. Preserve them, test them as one workspace, then separate mainline correctness changes from R2.6 experiments before tagging. In particular, never commit `app/qa/manual_qa.py` without its imported `app/retrieval/active_pipeline.py`.
+At the start of this review, the worktree was clean after the Runtime sampling-validation and Prefix-reuse/API documentation commits. This does not mark the pending screenshot/GIF capture, clean-clone plus offline-asset-bundle rehearsal, or RPATH portability work as complete. Keep pass, fail, and skip results separate in any release record; a skipped loopback HTTP test is not a pass.

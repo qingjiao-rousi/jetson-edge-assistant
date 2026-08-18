@@ -70,7 +70,7 @@ bash scripts/verify_public_repo.sh
 2. **先进入仓库根目录**，再依次执行只读检查：
 
 ```bash
-cd /home/nvidia/Desktop/llm/vlmllm-main
+# From the repository root
 
 python3 scripts/verify_local_assets.py --root . --config configs/assistant.json --profile contract
 python3 scripts/verify_local_assets.py --root . --config configs/assistant.json --profile build-inputs
@@ -80,13 +80,13 @@ python3 scripts/verify_local_assets.py --root . --config configs/assistant.json 
 3. 运行统一入口：
 
 ```bash
-cd /home/nvidia/Desktop/llm/vlmllm-main
+# From the repository root
 python3 scripts/run_local_assistant.py
 # 可选整句 TTS；不代表麦克风/ASR 已可用
 python3 scripts/run_local_assistant.py --speak
 ```
 
-提示符若显示 `nvidia@nvidia-desktop:~$`，说明当前仍在 `/home/nvidia`，不能直接执行仓库相对命令。也可以使用 `cd /home/nvidia/Desktop/llm/vlmllm-main && <command>` 一次性执行。
+以上命令必须从仓库根目录执行；否则 `scripts/`、`configs/` 等仓库相对路径不会被找到。
 
 终端使用 `/image tests/fixtures/vlm-service/synthetic-alarm-panel.png` 发起一次本地单图诊断。该路径不经过 RAG 引用校验。公开演示命令和待补截图位置见 [Demo 指南](docs/demo.md)。常见资产、ELF 架构和构建失败见 [离线部署](docs/jetson-offline-setup.md)。
 

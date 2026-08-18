@@ -52,6 +52,10 @@ htmlcov/
 *.wav
 *.pcm
 *.mp3
+*.flac
+*.ogg
+*.m4a
+*.aac
 demo-output/
 benchmarks/results/*.csv
 benchmarks/results/*.jsonl
