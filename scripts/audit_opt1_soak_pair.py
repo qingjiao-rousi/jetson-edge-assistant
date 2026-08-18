@@ -5,6 +5,26 @@ import argparse,json,pathlib,re,statistics,sys
 ROOT=pathlib.Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/"scripts"))
 from audit_opt1_soak import audit as audit_single
 
+def clock_provenance(output):
+    header=re.search(r"SOC family:\s*(\S+)\s+Machine:\s*(.+)",output)
+    online=re.search(r"Online CPUs:\s*([^\n]+)",output)
+    gpu=re.search(r"GPU MinFreq=(\d+) MaxFreq=(\d+)",output)
+    emc=re.search(r"EMC MinFreq=(\d+) MaxFreq=(\d+).*?FreqOverride=(\d+)",output)
+    power=re.search(r"NV Power Mode:\s*(\S+)",output)
+    cpus={f"cpu{index}":{"min_freq":int(low),"max_freq":int(high)} for index,low,high in re.findall(r"cpu(\d+):.*?MinFreq=(\d+) MaxFreq=(\d+)",output)}
+    if not all((header,online,gpu,emc,power)) or not cpus: raise ValueError("clock output missing required stable fields")
+    count=0
+    for item in online.group(1).split(","):
+        bounds=item.strip().split("-")
+        count+=int(bounds[-1])-int(bounds[0])+1
+    return {"soc_family":header.group(1),"machine":header.group(2).strip(),"online_cpu_count":count,"cpus":cpus,"gpu":{"min_freq":int(gpu.group(1)),"max_freq":int(gpu.group(2))},"emc":{"min_freq":int(emc.group(1)),"max_freq":int(emc.group(2)),"freq_override":int(emc.group(3))},"power_mode":power.group(1)}
+def clock_differences(left,right):
+    differences=[]
+    for key in ("soc_family","machine","online_cpu_count","gpu","emc","power_mode"):
+        if left.get(key)!=right.get(key): differences.append(key)
+    for cpu in sorted(set(left["cpus"])|set(right["cpus"])):
+        if left["cpus"].get(cpu)!=right["cpus"].get(cpu): differences.append(cpu)
+    return differences
 def trend(raw,path):
     log=pathlib.Path(raw.get("tegrastats_log") or path.with_suffix(".tegrastats.log"))
     text=log.read_text(encoding="utf-8",errors="replace") if log.is_file() else ""
@@ -22,8 +42,13 @@ def audit_pair(disabled,hot,disabled_path=pathlib.Path("disabled.json"),hot_path
         if raw.get("status")!="UNREVIEWED_RAW_RESULT":failures.append(f"{name}_not_formal_raw")
         requested=raw.get("requested_minutes");duration=raw.get("measured_duration_seconds")
         if not isinstance(requested,(int,float)) or not isinstance(duration,(int,float)) or duration<requested*60*duration_ratio:failures.append(f"{name}_duration_insufficient")
-    for key in ("commit","model_sha256","mmproj_sha256","prompt_sha256","clock_locked","clock_detail","clock_output","runtime_parameters"):
+    for key in ("commit","model_sha256","mmproj_sha256","prompt_sha256","clock_locked","clock_detail","runtime_parameters"):
         if disabled.get(key)!=hot.get(key):failures.append(f"provenance_mismatch:{key}")
+    try:
+        disabled_clock=clock_provenance(disabled.get("clock_output", ""));hot_clock=clock_provenance(hot.get("clock_output", ""))
+        failures.extend(f"clock_provenance_mismatch:{key}" for key in clock_differences(disabled_clock,hot_clock))
+    except ValueError as error:
+        failures.append(f"clock_provenance_unparseable:{error}");disabled_clock=hot_clock=None
     if disabled.get("mode")!="disabled" or hot.get("mode")!="single_hot_text":failures.append("mode_mismatch")
     ds,hs=response_shape(disabled),response_shape(hot)
     if ds!=hs:failures.append("response_shape_mismatch")
@@ -32,7 +57,7 @@ def audit_pair(disabled,hot,disabled_path=pathlib.Path("disabled.json"),hot_path
     if d_hash!=h_hash:failures.append("cross_mode_output_hash_mismatch")
     resource={"disabled":trend(disabled,disabled_path),"single_hot":trend(hot,hot_path)}
     if not resource["disabled"]["samples"] or not resource["single_hot"]["samples"]:failures.append("tegrastats_missing_or_unparseable")
-    return {"status":"PASS" if not failures else "FAIL","fail_reasons":sorted(set(failures)),"disabled":d,"single_hot":h,"response_shape":{"disabled":ds,"single_hot":hs},"resource_trend":resource,"unified_ram_is_not_a_kv_leak_proof":True}
+    return {"status":"PASS" if not failures else "FAIL","fail_reasons":sorted(set(failures)),"clock_provenance":{"disabled":disabled_clock,"single_hot":hot_clock},"disabled":d,"single_hot":h,"response_shape":{"disabled":ds,"single_hot":hs},"resource_trend":resource,"unified_ram_is_not_a_kv_leak_proof":True}
 def main():
     p=argparse.ArgumentParser();p.add_argument("disabled",type=pathlib.Path);p.add_argument("single_hot",type=pathlib.Path);p.add_argument("--minimum-duration-ratio",type=float,default=.95);a=p.parse_args()
     if not 0<a.minimum_duration_ratio<=1:p.error("--minimum-duration-ratio must be in (0, 1]")

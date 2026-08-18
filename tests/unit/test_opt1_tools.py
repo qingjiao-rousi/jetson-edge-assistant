@@ -30,9 +30,10 @@ class Opt1ToolsTest(unittest.TestCase):
   raw={"status":"UNREVIEWED_RAW_RESULT","worktree_clean":True,"clock_locked":True,"mode":"disabled","warmup":{"client_http_status":200,"error":None},"requests":[{"text_sha256":"a","response":row(1,520,1)}],"telemetry":{}}
   self.assertIn("disabled_nonzero_hit",load("audit_opt1_soak").audit(raw)["fail_reasons"])
  def paired_soak(self):
-  base={"status":"UNREVIEWED_RAW_RESULT","failure_reason":None,"commit":"c","worktree_clean":True,"clock_locked":True,"clock_detail":"locked","clock_output":"clock","model_sha256":"m","mmproj_sha256":"p","prompt_sha256":"q","runtime_parameters":{"context_tokens":8192,"batch_tokens":512,"ubatch_tokens":512,"gpu_layers":99,"host":"127.0.0.1","port":18086},"requested_minutes":30,"measured_duration_seconds":1710,"warmup":{"client_http_status":200,"error":None},"telemetry":{}}
+  def clocks(pwm): return f"SOC family:tegra234  Machine:Jetson\nOnline CPUs: 0-1\ncpu0: Online=1 MinFreq=1728000 MaxFreq=1728000 CurrentFreq=1728000 IdleStates: WFI=0\ncpu1: Online=1 MinFreq=1728000 MaxFreq=1728000 CurrentFreq=1728000 IdleStates: WFI=0\nGPU MinFreq=612000000 MaxFreq=612000000 CurrentFreq=612000000\nEMC MinFreq=204000000 MaxFreq=3199000000 CurrentFreq=3199000000 FreqOverride=1\nFAN Dynamic Speed Control=nvfancontrol hwmon1_pwm1={pwm}\nNV Power Mode: MODE_30W\n"
+  base={"status":"UNREVIEWED_RAW_RESULT","failure_reason":None,"commit":"c","worktree_clean":True,"clock_locked":True,"clock_detail":"locked","clock_output":clocks(71),"model_sha256":"m","mmproj_sha256":"p","prompt_sha256":"q","runtime_parameters":{"context_tokens":8192,"batch_tokens":512,"ubatch_tokens":512,"gpu_layers":99,"host":"127.0.0.1","port":18086},"requested_minutes":30,"measured_duration_seconds":1710,"warmup":{"client_http_status":200,"error":None},"telemetry":{}}
   disabled=dict(base,mode="disabled",requests=[{"text_sha256":"same","response":row(1,520,0)},{"text_sha256":"same","response":row(2,520,0)}])
-  hot=dict(base,mode="single_hot_text",requests=[{"text_sha256":"same","response":row(1,520,512)},{"text_sha256":"same","response":row(2,520,512)}])
+  hot=dict(base,mode="single_hot_text",clock_output=clocks(59),requests=[{"text_sha256":"same","response":row(1,520,512)},{"text_sha256":"same","response":row(2,520,512)}])
   return disabled,hot
  def test_paired_soak_requires_cross_mode_hash_match(self):
   d,h=self.paired_soak();h["requests"][1]["text_sha256"]="other";r=load("audit_opt1_soak_pair").audit_pair(d,h)
@@ -48,4 +49,9 @@ class Opt1ToolsTest(unittest.TestCase):
    hl.write_text("RAM 101/1\nRAM 111/1\nRAM 121/1\nRAM 131/1\nRAM 141/1\n")
    d["tegrastats_log"]=str(dl);h["tegrastats_log"]=str(hl);r=load("audit_opt1_soak_pair").audit_pair(d,h,dp,hp)
    self.assertEqual(r["status"],"PASS");self.assertEqual(r["resource_trend"]["disabled"]["ram_used_mb"]["peak"],140)
+ def test_paired_soak_rejects_stable_clock_difference(self):
+  d,h=self.paired_soak();h["clock_output"]=h["clock_output"].replace("MaxFreq=612000000", "MaxFreq=306000000", 1);r=load("audit_opt1_soak_pair").audit_pair(d,h)
+  self.assertIn("clock_provenance_mismatch:gpu",r["fail_reasons"])
+  d,h=self.paired_soak();h["clock_output"]=h["clock_output"].replace("FreqOverride=1", "FreqOverride=0");r=load("audit_opt1_soak_pair").audit_pair(d,h)
+  self.assertIn("clock_provenance_mismatch:emc",r["fail_reasons"])
 if __name__=="__main__":unittest.main()
