@@ -16,6 +16,8 @@ EdgeOmni 面向无云网络的工业设备知识问答与**单图**故障诊断�
 | 实机验证到哪里 | clean commit 已完成 Jetson Q4/Q8 配对文本和固定单图基线；另以 `de19d15` 完成离线资产 clean-clone、CUDA 全量构建、5/5 CTest、可移动 bundle 双路径审计及文本/RAG/单图 smoke |
 | 怎么复核 | clone 后运行 `bash scripts/verify_public_repo.sh`；资产齐备后运行 `python3 scripts/run_local_assistant.py` |
 
+第一次阅读代码建议从 [代码地图](docs/code-map.md) 开始；它区分默认运行主线、可选入口、实验工具和历史资料。
+
 ## 架构
 
 ```mermaid
@@ -150,7 +152,7 @@ scripts/       启动、资产检查与公开仓库验证入口
 benchmarks/    可公开的指标口径、空白结果模板（不含伪造数据）
 knowledge/     受版本控制的合成设备手册与故障码事实
 tests/         不依赖真实模型或麦克风的单元/集成测试
-docs/          架构、验证、边界、Demo 和发布记录
+docs/          架构、代码地图、验证、边界、Demo 和发布记录
 ```
 
 当前 RAG 业务入口是 `app/retrieval/active_pipeline.py`：默认保持 R2.5 query-time gate，并使用 R2.2 SQLite index 合同。R2.6 candidate 是未进入默认路径的实验，不能据此宣称 R2.5 或 R2.6 已通过最终质量门。
