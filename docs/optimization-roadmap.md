@@ -28,7 +28,7 @@ P0 clean-clone 验证输入：`de19d15`（可移动 bundle、双路径审计与�
 | 核心离线原型 | **完成（按声明范围）** | 文本/单图 Runtime、RAG/Agent、离线合同、Jetson load/ready/请求 | 不包含视频、多图、批处理和高并发 |
 | Jetson 短时性能证据 | **完成** | Q4/Q8 文本、固定单图 E2E/阶段计时和资源遥测 | 不代表长稳、墙插功耗、质量或生产尾延迟 |
 | RAG/VLM 质量 | **部分完成** | 引用/拒答合同；RAG R2.5 明确为 PARTIAL | 新独立 RAG eval、真实 VLM 小型质量集 |
-| 部署运维 | **部分完成** | 原生离线构建/启动/校验流程、OPT-1 30 分钟 serial soak | clean-clone 演练、无 skip HTTP CTest、systemd、日志轮转、120 分钟/故障注入 |
+部署运维 | 部分完成 | 原生离线构建/启动/校验流程、clean-clone bundle 演练、5/5 CTest、OPT-1 30 分钟 serial soak | systemd、日志轮转、120 分钟/故障注入
 | 深入性能优化 | **OPT-1 INTEGRATED（main）** | main Jetson 双路径 correctness、四档 Runtime-length matrix、paired 30 分钟 soak | 120 分钟 soak、故障注入、RAG LCP 分布、Agent/RAG 映射 |
 | 生产化 | **未实现且非当前目标** | 无 | 鉴权、审计、多用户调度、故障注入、生产 SLA |
 
