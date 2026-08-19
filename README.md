@@ -91,6 +91,18 @@ python3 scripts/run_local_assistant.py --speak
 
 终端使用 `/image tests/fixtures/vlm-service/synthetic-alarm-panel.png` 发起一次本地单图诊断。该路径不经过 RAG 引用校验。公开演示命令和待补截图位置见 [Demo 指南](docs/demo.md)。常见资产、ELF 架构和构建失败见 [离线部署](docs/jetson-offline-setup.md)。
 
+## 公开展示材料
+
+当前可公开复核的证据按优先级排列如下：
+
+1. Jetson `/ready` 与最小文本请求：证明 Runtime 加载和 HTTP 服务链路；
+2. RAG 带 `[S1]` 引用回答与无证据拒答：证明引用/拒答门禁，不代表 R2.5 最终质量门通过；
+3. `/image tests/fixtures/vlm-service/synthetic-alarm-panel.png`：证明固定单图端到端连通，不代表视觉准确率；
+4. Q4/Q8 文本、固定单图和视觉阶段 benchmark 表：证明固定协议下的短时对照，不外推为生产 SLA；
+5. clean-clone 可移动 bundle：证明离线资产合同、5/5 CTest、manifest、相对 RPATH 和双路径依赖审计。
+
+截图/GIF 尚未随仓库分发；不使用合成截图替代 Jetson 实机证据。脱敏素材补充规则见 [Demo 指南](docs/demo.md) 和 [assets 规范](docs/assets/README.md)。
+
 ## 本项目的二次开发范围
 
 - **C++ Runtime/服务层：** 请求合同、HTTP/JSON/SSE、`/health`/`/ready`、timeout/cancel、单请求并发保护、固定容量 request-id 记录、指标输出和单图 VLM 适配。

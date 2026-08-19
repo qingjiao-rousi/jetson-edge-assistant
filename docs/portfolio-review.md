@@ -101,10 +101,10 @@
 
 ### 评分与定位
 
-- 当前评分：**8.8/10**。
-- 是否适合作为主项目：**适合端侧 AI 部署/C++ Runtime/Jetson 岗位的主项目**。当前已有同 commit Q4/Q8 配对文本、固定单图 E2E 和视觉阶段计时结果；投递前最值得补的是 2-3 个真实 Demo 截图/GIF、VLM 小型质量集和长稳记录。
+- 当前定位：**适合作为端侧 AI 部署 / C++ Runtime / Jetson 岗位主项目**。
+- 是否适合作为主项目：**适合端侧 AI 部署/C++ Runtime/Jetson 岗位的主项目**。当前已有同 commit Q4/Q8 配对文本、固定单图 E2E、视觉阶段计时、clean-clone 可移动 bundle 和最小 Runtime/RAG/单图 smoke；2-3 个脱敏 Demo 截图/GIF仍可提升展示效果，但不是 P0 工程阻断。
 - 主要加分：C++ Runtime 并非薄命令包装；HTTP/SSE/取消超时、`DirectBackend` 单热 KV 状态、资产合同、RAG/Agent 门禁和测试都有代码证据。
-- 主要扣分：准确率/长稳仍缺公开证据、RAG PARTIAL、HTTP 测试本环境 skip、clean-clone+离线包未独立演练。
+- 主要扣分：VLM 准确率/长稳仍缺公开证据、RAG PARTIAL、systemd/鉴权/高并发生产能力未实现。
 
 推荐 GitHub 标题：**EdgeOmni: Offline Multimodal RAG Assistant on Jetson AGX Orin**
 
@@ -113,38 +113,38 @@
 ### 简历描述：端侧 AI 部署 / 推理优化 / C++ Runtime
 
 - 基于固定 commit 的 `llama.cpp-omni` 二次开发 C++17 Runtime 服务层，设计 HTTP/JSON/SSE、`/ready`、结构化错误、超时/取消、单活动请求保护与可观测指标合同。
-- 基于上游 KV memory API 在 `DirectBackend` 验证路径实现单热文本 session 的 Token LCP Prefix reuse，覆盖同前缀、分叉、回滚以及图像/取消/超时/异常失效；实际 Qwen2.5-VL `MtmdBackend` 接入与 Prefill/TTFT 实测列为独立优化课题，不包装为生产多用户缓存。
+- 基于上游 KV memory API 在实际 Qwen2.5-VL `MtmdBackend` 路径实现 text-only 单热 session 的 Token LCP Prefix reuse，覆盖完整 batch 边界、分叉/回滚以及图像/session/取消/超时/reset 失效；不包装为生产多用户缓存，RAG/Agent 尚未传递 Runtime `session_id`。
 - 为 Qwen2.5-VL-3B GGUF 建立模型/MMProj 大小与 SHA-256、AArch64 ELF、submodule commit 和 SQLite source binding 的离线资产合同与只读 preflight。
 - 建立 Q4_K_M/Q8_0 可复现实验协议与 Jetson 采集器；同一 clean commit 下各完成 15 次锁频请求，decode 中位数 15.101/15.227 token/s、统一 RAM 中位数 12,458/13,928 MB，并通过 SHA-256 绑定 Runtime/collector/raw evidence。
 - 为固定合成单图建立 Q4/Q8 clean-commit E2E 对照：15/15 请求成功，Runtime total 中位数 1,530/1,462 ms，同时明确 `not_measured` 视觉阶段零值不可当作 0 ms 结论。
-- 在后续 clean commit 接入结构化阶段计时并重测：Q4/Q8 vision encode 中位数 305/277 ms、embedding 注入 31/28 ms，所有阶段均带显式 measured 状态和原始证据哈希。
+- 在 clean commit 接入结构化阶段计时并重测：Q4/Q8 vision encode 中位数 305/277 ms、embedding 注入 31/28 ms，所有阶段均带显式 measured 状态和原始证据哈希。
 
 ### 简历描述：嵌入式 AI / 边缘计算 / Jetson
 
 - 面向 Jetson AGX Orin ARM64/CUDA 构建无云网络工业知识助手原型，整合本地文本/单图 VLM、SQLite/FTS5 Hybrid RAG、终端和实验性半双工语音链路。
-- 设计离线交付合同和统一启动器：拒绝端口复用，启动后轮询 `/ready`，按仓库相对路径校验模型/索引，失败保留诊断日志并回收子进程。
+- 设计离线交付合同和统一启动器：拒绝端口复用，启动后轮询 `/ready`，按仓库相对路径校验模型/索引，失败保留诊断日志并回收子进程；P0 clean-clone bundle 已通过 5/5 CTest、manifest、双路径 RPATH/ldd 审计。
 - 实现设备/故障码约束、无证据短路、引用保留/citation gate 以及有界只读 Agent/SessionStore，降低离线维护问答的无依据生成风险。
-- 在 Jetson AGX Orin MODE_30W 锁频环境记录 37/37 CUDA layer offload 和 Q4 文本基线，并完成固定单图冒烟；明确视频、多图、高并发、生产鉴权和长稳仍未完成。
+- 在 Jetson AGX Orin MODE_30W 锁频环境记录 37/37 CUDA layer offload 和 Q4 文本基线，并完成固定单图、RAG 引用/拒答和可移动 bundle smoke；明确视频、多图、高并发、生产鉴权和长稳仍未完成。
 
 ### 招聘者可能追问的 10 个问题与建议回答
 
 1. **你与 llama.cpp-omni 的边界是什么？** 上游负责 GGUF/GGML、CUDA、加载、tokenizer/sampler 和 mtmd；我负责服务合同、适配、状态管理、RAG/Agent/启动与离线校验，证据在 `docs/architecture.md` 的所有权表。
-2. **KV 优化是不是自己写了 KV Cache？** 不是。底层 KV 由上游提供；当前在 `DirectBackend` 实现的是单 hot session 的 Token LCP、KV 范围保留/回滚和失效策略，不是 paged KV 或多用户缓存。Qwen2.5-VL 主路径接入仍处于计划阶段，不能提前宣称收益。
+2. **KV 优化是不是自己写了 KV Cache？** 不是。底层 KV 由上游提供；EdgeOmni 在实际 Qwen2.5-VL `MtmdBackend` 路径实现的是 text-only 单 hot session 的 Token LCP、完整 batch 边界、回滚和失效策略，不是 paged KV 或多用户缓存。图像请求、session 切换、timeout、cancel 和 reset 会清空复用状态。
 3. **为什么只能单热 session？** 当前 Runtime 串行化 backend，并只保存一组 session_id/prompt tokens；这是为了受控内存和可验证状态。多 session 需要内存预算、调度与淘汰策略，不能用 Agent 的 8 个逻辑 session 代替。
 4. **Q4 为什么优先于 Q8？快多少？** 配对文本结果中 Q8 decode 仅高 0.83%、总延迟低 0.81%，应视为近似持平；但 Q8 统一 RAM 多 1,470 MB、CUDA model buffer 多 1,292.78 MiB、model ready 慢 43.4%，所以 Q4 的优势是资源效率，不是速度更快。该结论不外推到图像或长上下文。
 5. **37/37 offload 能说明什么？** 只说明模型层按记录被 CUDA offload，不证明全部算子、端到端性能、功耗或稳定性达标。
 6. **RAG 为什么是 PARTIAL？** 冻结 holdout 已消费且最终质量门未通过，不能重跑调参。当前路径保留 R2.5 query gate 和引用/拒答合同；新候选必须使用独立 dev/eval 设计。
 7. **怎样防止无依据回答？** 检索先做设备/故障码和 evidence admission；无证据时不调用模型。生成后校验引用是否属于该 session 的检索结果，失败会重试或拒绝。
-8. **HTTP/SSE/取消如何验证？** FakeBackend C++ 合同覆盖路由、事件顺序、重复 ID、busy、cancel、timeout 和单图输入；本沙箱 loopback test skip，需在允许绑定的 CI/Jetson 重跑，不能把 skip 算 pass。
+8. **HTTP/SSE/取消如何验证？** FakeBackend C++ 合同覆盖路由、事件顺序、重复 ID、busy、cancel、timeout 和单图输入；允许 loopback 的 Jetson 主机上 `edgeomni_service_unit_test` 实际通过，当前 clean-clone CTest 为 5/5 pass、0 skip。
 9. **离线部署如何确保资产一致？** 配置记录相对路径、revision、大小和 SHA-256；preflight 校验 submodule commit、AArch64 ELF、模型、SQLite 元数据和 source binding，全程不联网、不改资产。
-10. **离生产还有什么？** systemd/日志轮转、独立 clean-clone 演练、鉴权/威胁模型、多会话调度、30-60 分钟以上 soak、错误恢复和真实音频设备验证；Docker不是当前 P0。
+10. **离生产还有什么？** systemd/日志轮转、鉴权/威胁模型、多会话调度、120 分钟 soak/故障注入、错误恢复和真实音频设备验证；Docker不是当前 P0。现有 bundle 验证只针对固定 Jetson/L4T/CUDA 和 pinned upstream，不是跨平台保证。
 
 ### 最值得继续优化的方面
 
-1. 推理状态优化：把单热 Token LCP Prefix Reuse 接入实际 Qwen2.5-VL `MtmdBackend` text-only 路径，以正确性门和 256-2048 token A/B 实测证明 Prefill/TTFT 收益。
+1. 推理状态优化：在已有 `MtmdBackend` text-only 单热 Prefix Reuse 基础上，用新的 workload 继续测量 RAG prompt LCP 分布；不要将单热缓存扩展成未验证的多用户能力。
 2. 真实 Demo：RAG 引用/拒答、单图诊断和 SSE 的 2-3 个短证据，展示价值高于新增 Web 前端。
 3. VLM 性能与质量：冻结小型真实设备图质量集后，建立分辨率/image tokens/视觉阶段延迟/事实正确率的权衡。
-4. 可复现部署：新路径或第二台 Jetson 做 clean clone + 离线 bundle 演练。
+4. 可复现部署：若更换 JetPack、上游 commit 或资产合同，再做新的 clean clone + 离线 bundle 演练。
 5. C++ 测试：在可绑定 loopback 的 CI/Jetson 完整执行 service contract，并明确禁止 silent skip。
 
 ### P1/P2
@@ -155,6 +155,6 @@ P2：在明确 SLA 后设计鉴权/审计、多 session KV/调度/内存预算�
 
 ## 最终证据清单
 
-已具备：101 项模型无关 Python 测试、C++ FakeBackend 测试代码、离线资产合同、固定 submodule、合成手册/图片 fixture、同 commit Q4/Q8 `ready -> requests -> stopped` 配对文本、固定单图 E2E 与阶段计时基线、37/37 layer offload、公开验证入口、benchmark 协议和 Demo 规范。
+已具备：118 项模型无关 Python 测试、C++ Runtime 测试、离线资产合同、固定 submodule、合成手册/图片 fixture、同 commit Q4/Q8 `ready -> requests -> stopped` 配对文本、固定单图 E2E 与阶段计时基线、37/37 layer offload、clean-clone CUDA build、5/5 CTest、56 ELF/14 symlink 双路径 bundle 审计、公开验证入口、benchmark 协议和 Demo 规范。
 
-待补：单图准确率、真实 Jetson CTest 无 skip、RAG 引用/拒答截图、单图 GIF/SSE 记录、clean-clone 离线交付记录、30-60 分钟 soak、systemd 运维证据。Q4/Q8 文本、固定单图 E2E 与阶段计时已有统一 RAM/温度/板载 rail；墙插功耗、生产 SLA、准确率和高并发目前不足以证明。
+待补：单图准确率、RAG 引用/拒答截图、单图 GIF/SSE 记录、systemd 运维证据。Q4/Q8 文本、固定单图 E2E 与阶段计时已有统一 RAM/温度/板载 rail；墙插功耗、生产 SLA、准确率和高并发目前不足以证明。

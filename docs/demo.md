@@ -1,6 +1,6 @@
 # 公开 Demo 指南
 
-本页定义可公开复核的演示证据，不提供预先制作的假截图。`docs/assets/` 当前只有证据规范；终端录屏、截图和对应脱敏文本均为**待 Jetson 实测后补充**。
+本页定义可公开复核的演示证据，不提供预先制作的假截图。`docs/assets/` 当前只有证据规范；文字版 Jetson smoke 已冻结，终端录屏、截图和对应脱敏文本仍为**可选展示增强**。
 
 ## Demo A：离线终端 RAG 问答
 
@@ -10,9 +10,9 @@
 python3 scripts/run_local_assistant.py
 ```
 
-建议使用仓库内合成手册可回答的问题，例如 `BX-9 的 E42 是什么，检查什么？`。公开证据必须同时显示：问题、回答中的 `[S1]` 引用、引用对应的 `document_id/chunk_id`，以及无证据问题的拒答。不得展示私有手册、真实设备序列号或未脱敏路径。
+建议使用已验证的问题 `What outlet pressure does BX-9 specify?` 或 `What does alarm E42 mean on the BX-9?`。公开证据必须同时显示：问题、回答中的 `[S1]` 引用、引用对应的 `document_id/chunk_id`，以及无证据问题的拒答。不得展示私有手册、真实设备序列号或未脱敏路径。
 
-状态：**待补 Jetson 截图/GIF**。代码合同可由 `tests/integration/test_manual_qa.py` 和 Agent 单元测试复核；这不等于 RAG 最终质量门通过，R2.5 仍为 PARTIAL。
+状态：已有 Jetson 文字版引用/拒答 smoke；截图/GIF 为可选增强。代码合同可由 `tests/integration/test_manual_qa.py` 和 Agent 单元测试复核；这不等于 RAG 最终质量门通过，R2.5 仍为 PARTIAL。
 
 ## Demo B：单图诊断
 
@@ -24,7 +24,7 @@ python3 scripts/run_local_assistant.py
 
 公开证据应显示 Runtime ready、图片相对路径、非空模型结果和“未经过 RAG 检索或引用校验”的提示。不得把该固定合成图冒烟写成故障诊断准确率，也不得暗示视频、多图、批处理或并发能力。
 
-状态：已有文字版冻结冒烟记录，见 [Jetson 验证](jetson-validation.md)；**截图/GIF 待补**。
+状态：已有文字版冻结冒烟记录，见 [Jetson 验证](jetson-validation.md)；截图/GIF 为可选增强。
 
 ## Demo C：Runtime API/SSE
 
